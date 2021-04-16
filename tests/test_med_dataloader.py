@@ -5,7 +5,7 @@
 import pytest
 
 
-from med_dataloader import med_dataloader
+# from med_dataloader import med_dataloader
 
 
 @pytest.fixture
