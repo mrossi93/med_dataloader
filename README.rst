@@ -6,8 +6,10 @@ Medical Images Dataloader
 .. image:: https://img.shields.io/pypi/v/med_dataloader.svg
         :target: https://pypi.python.org/pypi/med_dataloader
 
-.. image:: https://img.shields.io/travis/mrossi93/med_dataloader.svg
+
+.. image:: https://img.shields.io/travis/com/mrossi93/med_dataloader?branch=master
         :target: https://travis-ci.com/mrossi93/med_dataloader
+        
 
 .. image:: https://readthedocs.org/projects/med-dataloader/badge/?version=latest
         :target: https://med-dataloader.readthedocs.io/en/latest/?version=latest
