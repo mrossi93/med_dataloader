@@ -19,4 +19,4 @@ python:
    install:
    - requirements: docs/requirements.txt
    - method: setuptools
-      path: med_dataloader
+     path: med_dataloader
