@@ -9,6 +9,9 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 
 class DataLoader:
+    """[summary]
+    """
+
     def __init__(self,
                  imgA_label,
                  imgB_label,
@@ -17,18 +20,52 @@ class DataLoader:
                  cache_mode="prod",
                  extract_only=None,
                  ):
+        """[summary]
+
+        Args:
+            imgA_label (str): Identifier for class A. It's the name of the
+                folder inside :py:attr:`imgs_subdir` that contains images
+                labeled as class A.
+            imgB_label (str): Identifier for class B. It's the name of the
+                folder inside :py:attr:`imgs_subdir` that contains images
+                labeled as class B.
+            data_dir (str, optional): Path to directory that contains the
+                Dataset. This folder **must** contain a subfolder named like
+                :py:attr:`imgs_subdir`. Defaults to './Data'.
+            imgs_subdir (str, optional): Name (**not** the entire path) of the 
+                folder that actually contains :py:attr:`imgA_label` and
+                :py:attr:`imgB_label` subfolders. It's a subfolder of Defaults
+                to 'Images'.
+            cache_mode (str, optional): One between "prod" or "test". "test" is
+                used as a debug modality only in case you want to create Cache
+                directory at the current folder location. "prod" creates a
+                subfolder named "Cache" inside :py:attr:`data_dir`. Defaults to
+                "prod".
+            extract_only (int, optional): Indicate wheter to partially cache a
+                certain amount of elements in the dataset. Please remember that
+                if "Cache" folder is already populated, you need to clean this
+                folder content to recreate a partial cache file. When it is
+                set to None, the entire Dataset is cached. Defaults to None.
+
+        Raises:
+            FileNotFoundError: :py:attr:`data_dir` doesn't exists.
+            FileNotFoundError: :py:attr:`imgs_subdir` doesn't exists.
+            FileNotFoundError: :py:attr:`imgA_label` doesn't exists.
+            FileNotFoundError: :py:attr:`imgB_label` doesn't exists.
+            ValueError: :py:attr:`cache_mode` is not "prod" nor "test".
+        """
 
         if not os.path.exists(data_dir):
-            raise ValueError(f"{data_dir} does not exist")
+            raise FileNotFoundError(f"{data_dir} does not exist")
 
         if not os.path.exists(os.path.join(data_dir, imgs_subdir)):
-            raise ValueError(f"{imgs_subdir} does not exist")
+            raise FileNotFoundError(f"{imgs_subdir} does not exist")
 
         if not os.path.exists(os.path.join(data_dir, imgs_subdir, imgA_label)):
-            raise ValueError(f"{imgA_label} does not exist")
+            raise FileNotFoundError(f"{imgA_label} does not exist")
 
         if not os.path.exists(os.path.join(data_dir, imgs_subdir, imgB_label)):
-            raise ValueError(f"{imgB_label} does not exist")
+            raise FileNotFoundError(f"{imgB_label} does not exist")
 
         self.data_dir = data_dir
         self.imgs_subdir = imgs_subdir
@@ -54,10 +91,8 @@ class DataLoader:
                     augmentation=False,
                     crop_size=128):
 
-        ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths,
-                                                img_label=self.imgA_label),
-                                  self.get_imgs(img_paths=self.imgB_paths,
-                                                img_label=self.imgB_label)
+        ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths),
+                                  self.get_imgs(img_paths=self.imgB_paths)
                                   ))
 
         ds = ds.map(self.check_dims, num_parallel_calls=AUTOTUNE)
@@ -80,12 +115,35 @@ class DataLoader:
 
         return ds
 
-    def get_imgs(self, img_paths, img_label):
+    def get_imgs(self, img_paths):
+        """Open image files for one class and store it inside cache.
+
+        This function performs all the (usually) slow reading operations that
+        is necessary to execute at least the first time. After the first
+        execution information are saved inside some cache file inside Cache
+        folder (typically created in your Dataset folder, at the same level of
+        Images folder). This function detects if cache files are already
+        present, and in that case it skips the definition of these files.
+        Please take into account that cache files will be as big as your
+        Dataset overall size. First execution may result in a considerably
+        bigger amount of time.
+
+        Args:
+            img_paths (str): Path to single class images.
+
+        Returns:
+            tf.Data.Dataset: Tensorflow dataset object containing images of one
+                classes converted in Tensor format, without any other
+                computations.
+        """
+        # Get parent folder name from first element in img_paths
+        img_label = os.path.basename(os.path.split(img_paths[0])[0])
+
         cache_file = os.path.join(self.cache_dir, f'{img_label}.cache')
         index_file = f'{cache_file}.index'
 
         ds = tf.data.Dataset.from_tensor_slices(img_paths)
-        ds = ds.map(lambda path: tf.py_function(self.parse_img,
+        ds = ds.map(lambda path: tf.py_function(self.open_img,
                                                 [path],
                                                 [tf.float32]),
                     num_parallel_calls=AUTOTUNE)
@@ -97,6 +155,14 @@ class DataLoader:
         return ds
 
     def get_imgs_paths(self):
+        """Get paths of every single image divided by classes.
+
+        Returns:
+            list, list: two list containing the paths of every images for both
+                classes. The list is sorted alphabetically, this can be usefull
+                when images are named with a progressive number inside a folder
+                (e.g.: 001.xxx, 002.xxx, ..., 999.xxx)
+        """
         print("Fetching images paths...")
         subset_dir = os.path.join(self.data_dir, self.imgs_subdir)
 
@@ -119,11 +185,18 @@ class DataLoader:
 
         return paths_imgA, paths_imgB
 
-    def parse_img(self, path):
-        path = path.numpy().decode("utf-8")
-        return self.open_file(path)
+    def open_img(self, path):
+        """Open an image file and convert it to a tensor.
 
-    def open_file(self, path):
+        Args:
+            path (tf.Tensor): Tensor containing the path to the file to be
+                opened.
+
+        Returns:
+            tf.Tensor: Tensor containing the actual image content.
+        """
+
+        path = path.numpy().decode("utf-8")
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
         # Scale image in 0-1 with a predefined range
