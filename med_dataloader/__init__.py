@@ -2,6 +2,6 @@
 
 __author__ = """Matteo Rossi"""
 __email__ = 'rossimatteo1993@gmail.com'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 from .med_dataloader import *  # noqa
