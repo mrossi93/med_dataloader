@@ -2,6 +2,15 @@
 History
 =======
 
+0.1.2 (2021-04-29)
+------------------
+
+* Improved code flexibility:
+    * It is possibile to choose which type of data augmentation is performed
+    * Boundaries for data normalization can be set by the user
+    * Images can be resized automatically by the user
+* Added basic_usage example also as a notebook
+
 0.1.1 (2021-04-20)
 ------------------
 
