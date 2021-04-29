@@ -107,12 +107,12 @@ class DataLoader:
                     num_parallel_calls=AUTOTUNE)
 
         if augmentation:
-            # TODO selectively choose which type of data augmentation to apply
             if random_crop_size:
-                ds = ds.map(lambda imgA, imgB: self.random_crop(imgA,
-                                                                imgB,
-                                                                random_crop_size),
-                            num_parallel_calls=AUTOTUNE)
+                ds = ds.map(
+                    lambda imgA, imgB: self.random_crop(imgA,
+                                                        imgB,
+                                                        random_crop_size),
+                    num_parallel_calls=AUTOTUNE)
             if random_rotate:
                 ds = ds.map(self.random_rotate, num_parallel_calls=AUTOTUNE)
             if random_flip:
@@ -213,9 +213,6 @@ class DataLoader:
         path = path.numpy().decode("utf-8")
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
-        # Scale image in 0-1 with a predefined range
-        # TODO: remove hardcoding in this function
-        # image = self.normalise_with_boundaries(image, lb=-1024, ub=3200)
         tensor = tf.convert_to_tensor(image)
         return tf.expand_dims(tensor, axis=-1)
 

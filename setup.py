@@ -29,7 +29,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
-    description="A general-purpose Dataloader for Tensorflow 2.x. It supports many medical image formats.",
+    description="A general-purpose Dataloader for Tensorflow 2.x. It supports many medical image formats.",  # noqa
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
