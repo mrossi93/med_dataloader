@@ -2,6 +2,15 @@
 History
 =======
 
+0.1.5 (2021-04-30)
+------------------
+
+* Added support for 3D files: now Dataloader automatically detects whether a
+  file is 2D or 3D and returns the properly sized dataset. Please remember that
+  med_dataloader returns tf.data.Dataset object for 2D tasks, 3D is not yet
+  supported.
+* Added new notebook in examples folder.
+
 0.1.4 (2021-04-29)
 ------------------
 
