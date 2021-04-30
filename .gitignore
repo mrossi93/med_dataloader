@@ -1,5 +1,5 @@
 data/*
-examples/Test_Dataset/Cache
+examples/*/Cache
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

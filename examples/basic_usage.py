@@ -4,7 +4,7 @@ import med_dataloader as med_dl
 
 dl = med_dl.DataLoader(imgA_label="CBCT",
                        imgB_label="CT",
-                       data_dir="Test_Dataset")
+                       data_dir="Test_Dataset_mha")
 
 train_ds, valid_ds, test_ds = med_dl.generate_dataset(data_loader=dl,
                                                       input_size=256,
