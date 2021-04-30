@@ -86,19 +86,22 @@ class DataLoader:
             self.imgA_paths = self.imgA_paths[:extract_only]
             self.imgB_paths = self.imgB_paths[:extract_only]
 
+        self.is_3D = self.is_3D_data(self.imgA_paths[0])
+
     def get_dataset(self,
                     input_size,
                     batch_size=32,
-                    norm_bounds=None,
+                    norm_boundsA=None,
+                    norm_boundsB=None,
                     augmentation=False,
                     random_crop_size=None,
                     random_rotate=False,
                     random_flip=False):
 
         ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths,
-                                                norm_bounds=norm_bounds),
+                                                norm_bounds=norm_boundsA),
                                   self.get_imgs(img_paths=self.imgB_paths,
-                                                norm_bounds=norm_bounds)
+                                                norm_bounds=norm_boundsB)
                                   ))
 
         ds = ds.map(lambda imgA, imgB: self.check_dims(imgA,
@@ -157,10 +160,14 @@ class DataLoader:
                     num_parallel_calls=AUTOTUNE)
 
         if norm_bounds is not None:
-            ds = ds.map(lambda imgA: self.norm_with_bounds(imgA,
-                                                           norm_bounds),
+            ds = ds.map(lambda img: self.norm_with_bounds(img,
+                                                          norm_bounds),
                         num_parallel_calls=AUTOTUNE
                         )
+
+        if self.is_3D:
+            ds = ds.unbatch()
+
         ds = ds.cache(cache_file)
 
         if not os.path.exists(index_file):
@@ -214,6 +221,8 @@ class DataLoader:
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
         tensor = tf.convert_to_tensor(image)
+        tensor = tf.cast(tensor, dtype=tf.float32)
+
         return tf.expand_dims(tensor, axis=-1)
 
     def _populate_cache(self, ds, cache_file, num_tot):
@@ -226,10 +235,20 @@ class DataLoader:
             sys.stdout.flush()
         print(f"\nCached decoded images in {cache_file}.")
 
-    # -----------------------------------------------------------
-    #  Transformations
-    # -----------------------------------------------------------
     @staticmethod
+    def is_3D_data(path):
+        image = sitk.GetArrayFromImage(sitk.ReadImage(path))
+
+        if len(image.shape) == 3:
+            return True
+        elif len(image.shape) == 2:
+            return False
+        else:
+            raise ValueError("Work only with 2D or 3D files.")
+
+        return True
+
+    @ staticmethod
     def check_dims(imgA, imgB, size):
         imgA = tf.expand_dims(tf.squeeze(imgA), axis=-1)
         imgA = tf.image.resize_with_pad(imgA, size, size)
@@ -239,7 +258,10 @@ class DataLoader:
 
         return imgA, imgB
 
-    @staticmethod
+    # -----------------------------------------------------------
+    #  Transformations
+    # -----------------------------------------------------------
+    @ staticmethod
     def norm_with_bounds(image, bounds):
         """Image normalisation. Normalises image in the range defined by lb and
         ub to fit [0, 1] range."""
@@ -255,14 +277,7 @@ class DataLoader:
 
         return image
 
-    @staticmethod
-    def resize(imgA, imgB, size=256):
-        imgA = tf.image.resize(imgA, (size, size))
-        imgB = tf.image.resize(imgB, (size, size))
-
-        return imgA, imgB
-
-    @staticmethod
+    @ staticmethod
     def random_crop(imgA, imgB, crop_size=256):
         stacked_img = tf.stack([imgA, imgB], axis=0)
         cropped_img = tf.image.random_crop(
@@ -273,14 +288,14 @@ class DataLoader:
         imgB = tf.expand_dims(tf.squeeze(cropped_img[1]), axis=-1)
         return imgA, imgB
 
-    @staticmethod
+    @ staticmethod
     def random_flip(imgA, imgB):
         if tf.random.uniform(()) > 0.5:
             imgA = tf.image.flip_left_right(imgA)
             imgB = tf.image.flip_left_right(imgB)
         return imgA, imgB
 
-    @staticmethod
+    @ staticmethod
     def random_rotate(imgA, imgB):
         rn = tf.random.uniform(shape=(), maxval=4, dtype=tf.int32)
         imgA = tf.image.rot90(imgA, k=rn)
@@ -292,7 +307,8 @@ def generate_dataset(data_loader,
                      input_size,
                      percentages,
                      batch_size,
-                     norm_bounds=None,
+                     norm_boundsA=None,
+                     norm_boundsB=None,
                      train_augmentation=True,
                      random_crop_size=None,
                      random_rotate=True,
@@ -310,13 +326,9 @@ def generate_dataset(data_loader,
     if num_imgsA != num_imgsB:
         raise ValueError("The CBCT and CT subsets have different dimension!")
 
-    train_ends = int(num_imgsA * percentages[0])
-
-    valid_begins = train_ends
-    valid_ends = valid_begins + int(num_imgsA * percentages[1])
-
     complete_ds = data_loader.get_dataset(batch_size=batch_size,
-                                          norm_bounds=norm_bounds,
+                                          norm_boundsA=norm_boundsA,
+                                          norm_boundsB=norm_boundsB,
                                           input_size=input_size,
                                           augmentation=train_augmentation,
                                           random_crop_size=random_crop_size,
@@ -325,12 +337,25 @@ def generate_dataset(data_loader,
 
     complete_ds = complete_ds.unbatch()
 
+    # Compute length of dataset
+    num_imgs = 0
+    for img in complete_ds:
+        num_imgs += 1
+
+    train_ends = int(num_imgs * percentages[0])
+
+    valid_begins = train_ends
+    valid_ends = valid_begins + int(num_imgs * percentages[1])
+
     # Train Datasets
     train_ds = complete_ds.take(train_ends)
     train_ds = train_ds.batch(batch_size)
 
+    # Same as before, but without augmentation since now we want to obtain
+    # validation and test set
     complete_ds = data_loader.get_dataset(batch_size=batch_size,
-                                          norm_bounds=norm_bounds,
+                                          norm_boundsA=norm_boundsA,
+                                          norm_boundsB=norm_boundsB,
                                           input_size=input_size,
                                           augmentation=False)
 
