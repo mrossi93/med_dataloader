@@ -87,6 +87,8 @@ class DataLoader:
             self.imgB_paths = self.imgB_paths[:extract_only]
 
         self.is_3D = self.is_3D_data(self.imgA_paths[0])
+        self.imgA_type = self.check_type(self.imgA_paths[0])
+        self.imgB_type = self.check_type(self.imgB_paths[0])
 
     def get_dataset(self,
                     input_size,
@@ -99,8 +101,10 @@ class DataLoader:
                     random_flip=False):
 
         ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths,
+                                                img_type=self.imgA_type,
                                                 norm_bounds=norm_boundsA),
                                   self.get_imgs(img_paths=self.imgB_paths,
+                                                img_type=self.imgB_type,
                                                 norm_bounds=norm_boundsB)
                                   ))
 
@@ -126,7 +130,7 @@ class DataLoader:
 
         return ds
 
-    def get_imgs(self, img_paths, norm_bounds=None):
+    def get_imgs(self, img_paths, img_type, norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
         This function performs all the (usually) slow reading operations that
@@ -156,7 +160,8 @@ class DataLoader:
         ds = tf.data.Dataset.from_tensor_slices(img_paths)
         ds = ds.map(lambda path: tf.py_function(self.open_img,
                                                 [path],
-                                                [tf.float32]),
+                                                [img_type],
+                                                ),
                     num_parallel_calls=AUTOTUNE)
 
         if norm_bounds is not None:
@@ -221,7 +226,6 @@ class DataLoader:
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
         tensor = tf.convert_to_tensor(image)
-        tensor = tf.cast(tensor, dtype=tf.float32)
 
         return tf.expand_dims(tensor, axis=-1)
 
@@ -247,6 +251,26 @@ class DataLoader:
             raise ValueError("Work only with 2D or 3D files.")
 
         return True
+
+    @staticmethod
+    def check_type(path):
+        image = sitk.GetArrayFromImage(sitk.ReadImage(path))
+
+        dict_type = {"int8": tf.int8,
+                     "int16": tf.int16,
+                     "int32": tf.int32,
+                     "int64": tf.int64,
+                     "uint8": tf.uint8,
+                     "uint16": tf.uint16,
+                     "uint32": tf.uint32,
+                     "uint64": tf.uint64,
+                     "float32": tf.float32,
+                     "float64": tf.float64,
+                     }
+
+        img_type = image.dtype.name
+
+        return dict_type[img_type]
 
     @ staticmethod
     def check_dims(imgA, imgB, size):
