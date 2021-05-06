@@ -2,6 +2,12 @@
 History
 =======
 
+0.1.6 (2021-05-06)
+------------------
+
+* Improved flexibility for image data types. Now cache dimension reflects the
+  actual dataset dimension.
+
 0.1.5 (2021-04-30)
 ------------------
 
