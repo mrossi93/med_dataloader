@@ -429,7 +429,7 @@ def get_dataset(data_dir,
     if len(percentages) != 3:
         raise ValueError("Percentages has to be a list of 3 elements")
 
-    if percentages[0] + percentages[1] + percentages[2] != 1.0:
+    if round((percentages[0] + percentages[1] + percentages[2]), 1) != 1.0:
         raise ValueError("Sum of percentages has to be 1")
 
     data_loader = DataLoader(mode="get",
