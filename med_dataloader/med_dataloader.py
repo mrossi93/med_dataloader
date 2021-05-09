@@ -1,11 +1,27 @@
 """Main module."""
 
 import os
-import sys
-import SimpleITK as sitk
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
+import SimpleITK as sitk
+import json
+import sys
+
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
+
+__dataloader_modality__ = ["get", "gen"]
+__dict_dtype__ = {"int8": tf.int8,
+                  "int16": tf.int16,
+                  "int32": tf.int32,
+                  "int64": tf.int64,
+                  "uint8": tf.uint8,
+                  "uint16": tf.uint16,
+                  "uint32": tf.uint32,
+                  "uint64": tf.uint64,
+                  "float32": tf.float32,
+                  "float64": tf.float64,
+                  }
 
 
 class DataLoader:
@@ -13,11 +29,15 @@ class DataLoader:
 
     def __init__(
         self,
-        imgA_label,
-        imgB_label,
+        mode,
+        input_size=None,
+        imgA_label=None,
+        imgB_label=None,
         data_dir="./Data",
-        imgs_subdir="Images",
-        cache_mode="prod",
+        output_dir=None,
+        norm_boundsA=None,
+        norm_boundsB=None,
+        # cache_mode="prod",
         extract_only=None,
     ):
         """[summary]
@@ -55,62 +75,118 @@ class DataLoader:
             ValueError: :py:attr:`cache_mode` is not "prod" nor "test".
         """
 
-        if not os.path.exists(data_dir):
-            raise FileNotFoundError(f"{data_dir} does not exist")
+        if mode not in __dataloader_modality__:
+            raise ValueError(f"{mode} modality not recognized. Choose between 'gen' or 'get'")  # noqa
 
-        if not os.path.exists(os.path.join(data_dir, imgs_subdir)):
-            raise FileNotFoundError(f"{imgs_subdir} does not exist")
+        self.mode = mode
 
-        if not os.path.exists(os.path.join(data_dir, imgs_subdir, imgA_label)):
-            raise FileNotFoundError(f"{imgA_label} does not exist")
+        if mode == "gen":
+            if not os.path.exists(data_dir):
+                raise FileNotFoundError(f"{data_dir} does not exist")
 
-        if not os.path.exists(os.path.join(data_dir, imgs_subdir, imgB_label)):
-            raise FileNotFoundError(f"{imgB_label} does not exist")
+            self.data_dir = data_dir
 
-        self.data_dir = data_dir
-        self.imgs_subdir = imgs_subdir
-        self.imgA_label = imgA_label
-        self.imgB_label = imgB_label
+            if output_dir is None:
+                self.output_dir = os.path.join(os.path.dirname(data_dir),
+                                               f"{os.path.basename(data_dir)}_TF")  # noqa
+            else:
+                self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
 
-        if cache_mode == "prod":
-            self.cache_dir = os.path.join(self.data_dir, "Cache")
-        elif cache_mode == "test":
-            self.cache_dir = "./Test_Cache"
-        else:
-            raise ValueError("Cache mode can be only 'prod' or 'test'")
-        os.makedirs(self.cache_dir, exist_ok=True)
+            if input_size is None:
+                raise ValueError("input_size is None")
 
-        self.imgA_paths, self.imgB_paths = self.get_imgs_paths()
+            self.input_size = input_size
 
-        if extract_only is not None:
-            self.imgA_paths = self.imgA_paths[:extract_only]
-            self.imgB_paths = self.imgB_paths[:extract_only]
+            if imgA_label is None or imgB_label is None:
+                raise ValueError("imgA_label or imgB_label is None.")
 
-        self.is_3D = self.is_3D_data(self.imgA_paths[0])
-        self.imgA_type = self.check_type(self.imgA_paths[0])
-        self.imgB_type = self.check_type(self.imgB_paths[0])
+            self.imgA_label = imgA_label
+            self.imgB_label = imgB_label
+
+            if not os.path.exists(os.path.join(data_dir,
+                                               imgA_label)):
+                raise FileNotFoundError(f"{imgA_label} does not exist")
+
+            if not os.path.exists(os.path.join(data_dir,
+                                               imgB_label)):
+                raise FileNotFoundError(f"{imgB_label} does not exist")
+
+            self.imgA_paths, self.imgB_paths = self.get_imgs_paths()
+
+            if extract_only is not None:
+                self.imgA_paths = self.imgA_paths[:extract_only]
+                self.imgB_paths = self.imgB_paths[:extract_only]
+
+            self.is_3D = self.is_3D_data(self.imgA_paths[0])
+            self.imgA_type = self.check_type(self.imgA_paths[0])
+            self.imgB_type = self.check_type(self.imgB_paths[0])
+            if norm_boundsA is not None:
+                self.norm_boundsA = [float(x) for x in norm_boundsA]
+            else:
+                self.norm_boundsA = norm_boundsA
+            if norm_boundsB is not None:
+                self.norm_boundsB = [float(x) for x in norm_boundsB]
+            else:
+                self.norm_boundsB = norm_boundsB
+
+            dataset_property = {"is3D": True,
+                                "input_size": self.input_size,
+                                "imgA_label": self.imgA_label,
+                                "imgB_label": self.imgB_label,
+                                "imgA_type": self.imgA_type,
+                                "imgB_type": self.imgB_type,
+                                "norm_boundsA": self.norm_boundsA,
+                                "norm_boundsB": self.norm_boundsB,
+                                }
+
+            output_dir_content = os.listdir(self.output_dir)
+            if output_dir_content is not None:
+                if "ds_property.json" not in output_dir_content:
+                    with open(os.path.join(self.output_dir,
+                                           "ds_property.json"), 'w') as property_file:  # noqa
+                        json.dump(dataset_property, property_file, indent=2)
+
+        elif mode == "get":
+            if not os.path.exists(data_dir):
+                raise FileNotFoundError(f"{data_dir} does not exist")
+            self.output_dir = data_dir
+
+            # dummy variables for images path
+            self.imgA_paths = []
+            self.imgB_paths = []
+            with open(os.path.join(self.output_dir,
+                                   "ds_property.json"), 'r') as property_file:
+                dataset_property = json.load(property_file)
+                self.is_3D = dataset_property["is3D"]
+                self.input_size = dataset_property["input_size"]
+                self.imgA_label = dataset_property["imgA_label"]
+                self.imgB_label = dataset_property["imgB_label"]
+                self.imgA_type = dataset_property["imgA_type"]
+                self.imgB_type = dataset_property["imgB_type"]
+                self.norm_boundsA = dataset_property["norm_boundsA"]
+                self.norm_boundsB = dataset_property["norm_boundsB"]
 
     def get_dataset(self,
-                    input_size,
                     batch_size=32,
-                    norm_boundsA=None,
-                    norm_boundsB=None,
                     augmentation=False,
                     random_crop_size=None,
                     random_rotate=False,
                     random_flip=False):
 
         ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths,
+                                                img_label=self.imgA_label,
                                                 img_type=self.imgA_type,
-                                                norm_bounds=norm_boundsA),
+                                                norm_bounds=self.norm_boundsA),
                                   self.get_imgs(img_paths=self.imgB_paths,
+                                                img_label=self.imgB_label,
                                                 img_type=self.imgB_type,
-                                                norm_bounds=norm_boundsB)
+                                                norm_bounds=self.norm_boundsB)
                                   ))
 
         ds = ds.map(lambda imgA, imgB: self.check_dims(imgA,
                                                        imgB,
-                                                       input_size),
+                                                       self.input_size),
                     num_parallel_calls=AUTOTUNE)
 
         if augmentation:
@@ -130,7 +206,7 @@ class DataLoader:
 
         return ds
 
-    def get_imgs(self, img_paths, img_type, norm_bounds=None):
+    def get_imgs(self, img_paths, img_label, img_type, norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
         This function performs all the (usually) slow reading operations that
@@ -151,16 +227,13 @@ class DataLoader:
                 classes converted in Tensor format, without any other
                 computations.
         """
-        # Get parent folder name from first element in img_paths
-        img_label = os.path.basename(os.path.split(img_paths[0])[0])
-
-        cache_file = os.path.join(self.cache_dir, f"{img_label}.cache")
+        cache_file = os.path.join(self.output_dir, f"{img_label}.cache")
         index_file = f"{cache_file}.index"
 
         ds = tf.data.Dataset.from_tensor_slices(img_paths)
         ds = ds.map(lambda path: tf.py_function(self.open_img,
                                                 [path],
-                                                [img_type],
+                                                [__dict_dtype__[img_type]],
                                                 ),
                     num_parallel_calls=AUTOTUNE)
 
@@ -190,10 +263,8 @@ class DataLoader:
                 (e.g.: 001.xxx, 002.xxx, ..., 999.xxx)
         """
         # print("Fetching images paths...")
-        subset_dir = os.path.join(self.data_dir, self.imgs_subdir)
-
-        subset_dir_imgA = os.path.join(subset_dir, self.imgA_label)
-        subset_dir_imgB = os.path.join(subset_dir, self.imgB_label)
+        subset_dir_imgA = os.path.join(self.data_dir, self.imgA_label)
+        subset_dir_imgB = os.path.join(self.data_dir, self.imgB_label)
 
         filenames_imgA = os.listdir(subset_dir_imgA)
         filenames_imgB = os.listdir(subset_dir_imgB)
@@ -208,6 +279,10 @@ class DataLoader:
         # Sort paths alphabetically
         paths_imgA.sort()
         paths_imgB.sort()
+
+        if len(paths_imgA) != len(paths_imgB):
+            raise ValueError(
+                f"Dimension mismatch: {len(paths_imgA)} != {len(paths_imgB)}")
 
         return paths_imgA, paths_imgB
 
@@ -256,21 +331,10 @@ class DataLoader:
     def check_type(path):
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
-        dict_type = {"int8": tf.int8,
-                     "int16": tf.int16,
-                     "int32": tf.int32,
-                     "int64": tf.int64,
-                     "uint8": tf.uint8,
-                     "uint16": tf.uint16,
-                     "uint32": tf.uint32,
-                     "uint64": tf.uint64,
-                     "float32": tf.float32,
-                     "float64": tf.float64,
-                     }
-
         img_type = image.dtype.name
 
-        return dict_type[img_type]
+        # return __dict_dtype__[img_type]
+        return img_type
 
     @ staticmethod
     def check_dims(imgA, imgB, size):
@@ -327,17 +391,40 @@ class DataLoader:
         return imgA, imgB
 
 
-def generate_dataset(data_loader,
+def generate_dataset(data_dir,
+                     imgA_label,
+                     imgB_label,
                      input_size,
-                     percentages,
-                     batch_size,
+                     output_dir=None,
+                     extract_only=None,
                      norm_boundsA=None,
                      norm_boundsB=None,
-                     train_augmentation=True,
-                     random_crop_size=None,
-                     random_rotate=True,
-                     random_flip=True,
                      ):
+
+    data_loader = DataLoader(mode="gen",
+                             input_size=input_size,
+                             imgA_label=imgA_label,
+                             imgB_label=imgB_label,
+                             data_dir=data_dir,
+                             output_dir=output_dir,
+                             norm_boundsA=norm_boundsA,
+                             norm_boundsB=norm_boundsB,
+                             extract_only=extract_only,
+                             )
+
+    data_loader.get_dataset()
+
+    return
+
+
+def get_dataset(data_dir,
+                percentages,
+                batch_size,
+                train_augmentation=True,
+                random_crop_size=None,
+                random_rotate=True,
+                random_flip=True,
+                ):
 
     if len(percentages) != 3:
         raise ValueError("Percentages has to be a list of 3 elements")
@@ -345,15 +432,11 @@ def generate_dataset(data_loader,
     if percentages[0] + percentages[1] + percentages[2] != 1.0:
         raise ValueError("Sum of percentages has to be 1")
 
-    num_imgsA = len(data_loader.imgA_paths)
-    num_imgsB = len(data_loader.imgB_paths)
-    if num_imgsA != num_imgsB:
-        raise ValueError("The CBCT and CT subsets have different dimension!")
+    data_loader = DataLoader(mode="get",
+                             data_dir=data_dir,
+                             )
 
     complete_ds = data_loader.get_dataset(batch_size=batch_size,
-                                          norm_boundsA=norm_boundsA,
-                                          norm_boundsB=norm_boundsB,
-                                          input_size=input_size,
                                           augmentation=train_augmentation,
                                           random_crop_size=random_crop_size,
                                           random_rotate=random_rotate,
@@ -378,9 +461,6 @@ def generate_dataset(data_loader,
     # Same as before, but without augmentation since now we want to obtain
     # validation and test set
     complete_ds = data_loader.get_dataset(batch_size=batch_size,
-                                          norm_boundsA=norm_boundsA,
-                                          norm_boundsB=norm_boundsB,
-                                          input_size=input_size,
                                           augmentation=False)
 
     complete_ds = complete_ds.unbatch()
