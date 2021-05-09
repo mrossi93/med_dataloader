@@ -2,7 +2,7 @@
 History
 =======
 
-0.1.7 (2021-05-09)
+0.1.8 (2021-05-09)
 ------------------
 
 * Main Changes in the package structure. Now there are two main functions: 
