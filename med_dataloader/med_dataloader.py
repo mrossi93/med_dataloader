@@ -1,10 +1,12 @@
 """Main module."""
 
 import os
-import sys
-import json
-import SimpleITK as sitk
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
+import SimpleITK as sitk
+import json
+import sys
+
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 

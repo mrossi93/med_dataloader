@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['tensorflow>=2.4', 'SimpleITK>=2.0']
+requirements = ['tensorflow>=2.4', 'SimpleITK>=2.0', "click"]
 
 setup_requirements = ['pytest-runner', ]
 
@@ -30,6 +30,8 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     description="A general-purpose Dataloader for Tensorflow 2.x. It supports many medical image formats.",  # noqa
+    entry_points={'console_scripts': [
+        'med_dataloader=med_dataloader.cli:main']},
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
