@@ -2,6 +2,15 @@
 History
 =======
 
+0.1.7 (2021-05-09)
+------------------
+
+* Main Changes in the package structure. Now there are two main functions: 
+  generate_dataset and get_dataset, both leveraging on DataLoader class.
+* The generation of the dataset can be handled also by CLI, to simplify usage.
+* Processed data can live by themself. No more need to transfer also original
+  file (e.g. to Drive to make use of them on Colab)
+
 0.1.6 (2021-05-06)
 ------------------
 
