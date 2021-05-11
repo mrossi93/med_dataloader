@@ -37,7 +37,6 @@ class DataLoader:
         output_dir=None,
         norm_boundsA=None,
         norm_boundsB=None,
-        # cache_mode="prod",
         extract_only=None,
     ):
         """[summary]
@@ -130,11 +129,17 @@ class DataLoader:
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
             if norm_boundsA is not None:
-                self.norm_boundsA = [float(x) for x in norm_boundsA]
-            else:
+                if norm_boundsA[0] >= norm_boundsA[1]:
+                    raise ValueError(
+                        f"Lower lim for normalization ({norm_boundsA[0]}) must be lower than upper lim ({norm_boundsA[1]})")  # noqa
                 self.norm_boundsA = norm_boundsA
+            else:
+                self.norm_boundsA = None
             if norm_boundsB is not None:
-                self.norm_boundsB = [float(x) for x in norm_boundsB]
+                if norm_boundsB[0] >= norm_boundsB[1]:
+                    raise ValueError(
+                        f"\rLower lim for normalization ({norm_boundsB[0]}) must be lower than upper lim ({norm_boundsB[1]})")  # noqa
+                self.norm_boundsB = norm_boundsB
             else:
                 self.norm_boundsB = norm_boundsB
 
@@ -242,10 +247,10 @@ class DataLoader:
                  norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
-        This function performs all the (usually) slow reading operations that
+        This function performs all the(usually) slow reading operations that
         is necessary to execute at least the first time. After the first
         execution information are saved inside some cache file inside Cache
-        folder (typically created in your Dataset folder, at the same level of
+        folder(typically created in your Dataset folder, at the same level of
         Images folder). This function detects if cache files are already
         present, and in that case it skips the definition of these files.
         Please take into account that cache files will be as big as your
@@ -253,7 +258,7 @@ class DataLoader:
         bigger amount of time.
 
         Args:
-            img_paths (str): Path to single class images.
+            img_paths(str): Path to single class images.
 
         Returns:
             tf.Data.Dataset: Tensorflow dataset object containing images of one
@@ -326,7 +331,7 @@ class DataLoader:
         """Open an image file and convert it to a tensor.
 
         Args:
-            path (tf.Tensor): Tensor containing the path to the file to be
+            path(tf.Tensor): Tensor containing the path to the file to be
                 opened.
 
         Returns:
@@ -389,22 +394,21 @@ class DataLoader:
 
         return imgA, imgB
 
-    # -----------------------------------------------------------
+    # -------------------------------------------------------------------------
     #  Transformations
-    # -----------------------------------------------------------
+    # -------------------------------------------------------------------------
     @ staticmethod
     def norm_with_bounds(image, bounds):
         """Image normalisation. Normalises image in the range defined by lb and
-        ub to fit [0, 1] range."""
-        epsilon = 1e-8
-        lb = bounds[0]
-        ub = bounds[1]
+        ub to fit[0, 1] range."""
+        lb = tf.cast(bounds[0], dtype=image.dtype)
+        ub = tf.cast(bounds[1], dtype=image.dtype)
 
         tf.where(image < lb, lb, image)
         tf.where(image > ub, ub, image)
 
         image = image - lb
-        image /= (ub - lb) + epsilon
+        image /= (ub - lb)
 
         return image
 
