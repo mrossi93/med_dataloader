@@ -21,7 +21,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option("-B", "--B_label",
               required=True,
               type=click.STRING,
-              help="Name of folder A inside 'data_dir'")
+              help="Name of folder B inside 'data_dir'")
 @click.option("-s", "--size_input",
               required=True,
               type=click.INT,
@@ -35,7 +35,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
               default=(None, None),
               show_default=True,
               type=(float, float),
-              help="Boundaries for normalization of A images.")
+              help="Boundaries for normalization of B images.")
 @click.option("-o", "--output_dir",
               default=None,
               show_default=True,
