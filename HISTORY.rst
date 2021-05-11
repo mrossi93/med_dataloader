@@ -2,6 +2,12 @@
 History
 =======
 
+0.1.9 (2021-05-11)
+------------------
+
+* Added support for RGB Images
+* Fixed some bugs related to norm_bounds types
+
 0.1.8 (2021-05-09)
 ------------------
 
