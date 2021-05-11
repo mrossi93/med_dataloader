@@ -7,7 +7,7 @@ import SimpleITK as sitk
 import json
 import sys
 
-
+# TODO possible bug in norm_bounds when img_type is uint8
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 __dataloader_modality__ = ["get", "gen"]
@@ -119,6 +119,14 @@ class DataLoader:
                 self.imgB_paths = self.imgB_paths[:extract_only]
 
             self.is_3D = self.is_3D_data(self.imgA_paths[0])
+            if self.is_3D:
+                self.is_A_RGB = self.is_RGB_data(self.imgA_paths[0])
+                self.is_B_RGB = self.is_RGB_data(self.imgB_paths[0])
+                if self.is_A_RGB or self.is_B_RGB:
+                    self.is_3D = False
+            else:
+                self.is_A_RGB = False
+                self.is_B_RGB = False
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
             if norm_boundsA is not None:
@@ -136,6 +144,8 @@ class DataLoader:
                                 "imgB_label": self.imgB_label,
                                 "imgA_type": self.imgA_type,
                                 "imgB_type": self.imgB_type,
+                                "is_A_RGB": self.is_A_RGB,
+                                "is_B_RGB": self.is_B_RGB,
                                 "norm_boundsA": self.norm_boundsA,
                                 "norm_boundsB": self.norm_boundsB,
                                 }
@@ -143,9 +153,23 @@ class DataLoader:
             output_dir_content = os.listdir(self.output_dir)
             if output_dir_content is not None:
                 if "ds_property.json" not in output_dir_content:
-                    with open(os.path.join(self.output_dir,
+                    # folder is not empty, but property file is missing,
+                    # we need to write it
+                    write_property = True
+                elif len(output_dir_content) == 1 and "ds_property.json" in output_dir_content:  # noqa
+                    # folder contains only an old version of property file,
+                    # we need to overwrite it
+                    write_property = True
+                else:
+                    # every necessary file already exist
+                    write_property = False
+            else:
+                write_property = False
+
+            if write_property:
+                with open(os.path.join(self.output_dir,
                                            "ds_property.json"), 'w') as property_file:  # noqa
-                        json.dump(dataset_property, property_file, indent=2)
+                    json.dump(dataset_property, property_file, indent=2)
 
         elif mode == "get":
             if not os.path.exists(data_dir):
@@ -164,6 +188,8 @@ class DataLoader:
                 self.imgB_label = dataset_property["imgB_label"]
                 self.imgA_type = dataset_property["imgA_type"]
                 self.imgB_type = dataset_property["imgB_type"]
+                self.is_A_RGB = dataset_property["is_A_RGB"]
+                self.is_B_RGB = dataset_property["is_B_RGB"]
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
 
@@ -177,10 +203,12 @@ class DataLoader:
         ds = tf.data.Dataset.zip((self.get_imgs(img_paths=self.imgA_paths,
                                                 img_label=self.imgA_label,
                                                 img_type=self.imgA_type,
+                                                is_RGB=self.is_A_RGB,
                                                 norm_bounds=self.norm_boundsA),
                                   self.get_imgs(img_paths=self.imgB_paths,
                                                 img_label=self.imgB_label,
                                                 img_type=self.imgB_type,
+                                                is_RGB=self.is_B_RGB,
                                                 norm_bounds=self.norm_boundsB)
                                   ))
 
@@ -206,7 +234,12 @@ class DataLoader:
 
         return ds
 
-    def get_imgs(self, img_paths, img_label, img_type, norm_bounds=None):
+    def get_imgs(self,
+                 img_paths,
+                 img_label,
+                 img_type,
+                 is_RGB,
+                 norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
         This function performs all the (usually) slow reading operations that
@@ -245,6 +278,9 @@ class DataLoader:
 
         if self.is_3D:
             ds = ds.unbatch()
+
+        if is_RGB:
+            ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
 
         ds = ds.cache(cache_file)
 
@@ -302,7 +338,7 @@ class DataLoader:
 
         tensor = tf.convert_to_tensor(image)
 
-        return tf.expand_dims(tensor, axis=-1)
+        return tensor
 
     def _populate_cache(self, ds, cache_file, num_tot):
         print(f"Caching decoded images in {cache_file}...")
@@ -325,7 +361,14 @@ class DataLoader:
         else:
             raise ValueError("Work only with 2D or 3D files.")
 
-        return True
+    @staticmethod
+    def is_RGB_data(path):
+        image = sitk.GetArrayFromImage(sitk.ReadImage(path))
+
+        if image.shape[-1] == 3:
+            return True
+        else:
+            return False
 
     @staticmethod
     def check_type(path):
