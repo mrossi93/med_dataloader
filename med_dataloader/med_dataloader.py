@@ -7,7 +7,6 @@ import SimpleITK as sitk
 import json
 import sys
 
-# TODO possible bug in norm_bounds when img_type is uint8
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 __dataloader_modality__ = ["get", "gen"]
@@ -35,6 +34,8 @@ class DataLoader:
         imgB_label=None,
         data_dir="./Data",
         output_dir=None,
+        is_B_categorical=False,
+        num_classes=None,
         norm_boundsA=None,
         norm_boundsB=None,
         extract_only=None,
@@ -128,6 +129,8 @@ class DataLoader:
                 self.is_B_RGB = False
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
+            self.is_B_categorical = is_B_categorical
+            self.num_classes = num_classes
             if norm_boundsA is not None:
                 if norm_boundsA[0] >= norm_boundsA[1]:
                     raise ValueError(
@@ -151,6 +154,8 @@ class DataLoader:
                                 "imgB_type": self.imgB_type,
                                 "is_A_RGB": self.is_A_RGB,
                                 "is_B_RGB": self.is_B_RGB,
+                                "is_B_categorical": self.is_B_categorical,
+                                "num_classes": self.num_classes,
                                 "norm_boundsA": self.norm_boundsA,
                                 "norm_boundsB": self.norm_boundsB,
                                 }
@@ -195,6 +200,8 @@ class DataLoader:
                 self.imgB_type = dataset_property["imgB_type"]
                 self.is_A_RGB = dataset_property["is_A_RGB"]
                 self.is_B_RGB = dataset_property["is_B_RGB"]
+                self.is_B_categorical = dataset_property["is_B_categorical"]
+                self.num_classes = dataset_property["num_classes"]
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
 
@@ -214,13 +221,10 @@ class DataLoader:
                                                 img_label=self.imgB_label,
                                                 img_type=self.imgB_type,
                                                 is_RGB=self.is_B_RGB,
+                                                is_categorical=self.is_B_categorical,  # noqa
+                                                num_classes=self.num_classes,
                                                 norm_bounds=self.norm_boundsB)
                                   ))
-
-        ds = ds.map(lambda imgA, imgB: self.check_dims(imgA,
-                                                       imgB,
-                                                       self.input_size),
-                    num_parallel_calls=AUTOTUNE)
 
         if augmentation:
             if random_crop_size:
@@ -244,6 +248,8 @@ class DataLoader:
                  img_label,
                  img_type,
                  is_RGB,
+                 is_categorical=False,
+                 num_classes=None,
                  norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
@@ -286,6 +292,15 @@ class DataLoader:
 
         if is_RGB:
             ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
+
+        ds = ds.map(lambda img: self.check_dims(img,
+                                                self.input_size),
+                    num_parallel_calls=AUTOTUNE)
+
+        if is_categorical:
+            ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
+                                                                  img_type)),
+                                               depth=num_classes))
 
         ds = ds.cache(cache_file)
 
@@ -355,7 +370,7 @@ class DataLoader:
             sys.stdout.flush()
         print(f"\nCached decoded images in {cache_file}.")
 
-    @staticmethod
+    @ staticmethod
     def is_3D_data(path):
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
@@ -366,7 +381,7 @@ class DataLoader:
         else:
             raise ValueError("Work only with 2D or 3D files.")
 
-    @staticmethod
+    @ staticmethod
     def is_RGB_data(path):
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
@@ -375,7 +390,7 @@ class DataLoader:
         else:
             return False
 
-    @staticmethod
+    @ staticmethod
     def check_type(path):
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
@@ -385,14 +400,11 @@ class DataLoader:
         return img_type
 
     @ staticmethod
-    def check_dims(imgA, imgB, size):
-        imgA = tf.expand_dims(tf.squeeze(imgA), axis=-1)
-        imgA = tf.image.resize_with_pad(imgA, size, size)
+    def check_dims(img, size):
+        img = tf.expand_dims(tf.squeeze(img), axis=-1)
+        img = tf.image.resize_with_pad(img, size, size)
 
-        imgB = tf.expand_dims(tf.squeeze(imgB), axis=-1)
-        imgB = tf.image.resize_with_pad(imgB, size, size)
-
-        return imgA, imgB
+        return img
 
     # -------------------------------------------------------------------------
     #  Transformations
@@ -446,6 +458,8 @@ def generate_dataset(data_dir,
                      extract_only=None,
                      norm_boundsA=None,
                      norm_boundsB=None,
+                     is_B_categorical=False,
+                     num_classes=None,
                      ):
 
     data_loader = DataLoader(mode="gen",
@@ -454,6 +468,8 @@ def generate_dataset(data_dir,
                              imgB_label=imgB_label,
                              data_dir=data_dir,
                              output_dir=output_dir,
+                             is_B_categorical=is_B_categorical,
+                             num_classes=num_classes,
                              norm_boundsA=norm_boundsA,
                              norm_boundsB=norm_boundsB,
                              extract_only=extract_only,
