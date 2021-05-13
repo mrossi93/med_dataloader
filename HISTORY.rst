@@ -2,6 +2,11 @@
 History
 =======
 
+0.1.10 (2021-05-13)
+------------------
+
+* Added support for one-hot encoding in case of multiclass label
+
 0.1.9 (2021-05-11)
 ------------------
 
