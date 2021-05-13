@@ -36,6 +36,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
               show_default=True,
               type=(float, float),
               help="Boundaries for normalization of B images.")
+@click.option("-n", "--num_classes",
+              default=None,
+              show_default=True,
+              required=False,
+              type=click.INT,
+              help="""Number of classes in case B folder contains categorical
+              labels""")
 @click.option("-o", "--output_dir",
               default=None,
               show_default=True,
@@ -50,7 +57,8 @@ def main(data_dir,
          b_label,
          size_input,
          bounds_a,
-         bounds_b):
+         bounds_b,
+         num_classes):
     """Console script for med_dataloader."""
     click.echo(f"""\rGenerating dataset with following parameters:
     data_dir: {data_dir},
@@ -58,18 +66,26 @@ def main(data_dir,
     B_label: {b_label},
     Size: {size_input},
     Boundaries A: {bounds_a},
-    Boundaries B: {bounds_b}""")
+    Boundaries B: {bounds_b},
+    Num classes: {num_classes}""")
 
     if bounds_a[0] is None:
         bounds_a = None
     if bounds_b[0] is None:
         bounds_b = None
 
+    if num_classes is not None:
+        is_B_categorical = True
+    else:
+        is_B_categorical = False
+
     generate_dataset(data_dir=data_dir,
                      imgA_label=a_label,
                      imgB_label=b_label,
                      input_size=size_input,
                      output_dir=output_dir,
+                     is_B_categorical=is_B_categorical,
+                     num_classes=num_classes,
                      norm_boundsA=bounds_a,
                      norm_boundsB=bounds_b,
                      )
