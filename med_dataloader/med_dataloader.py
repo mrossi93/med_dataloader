@@ -302,6 +302,7 @@ class DataLoader:
                                                                   img_type)),
                                                depth=num_classes))
 
+        ds = ds.map(lambda img: tf.cast(img, img_type))
         ds = ds.cache(cache_file)
 
         if not os.path.exists(index_file):
