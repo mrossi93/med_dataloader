@@ -285,7 +285,8 @@ class DataLoader:
             ds = ds.unbatch()
 
         if is_RGB:
-            ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
+            ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img),
+                        num_parallel_calls=AUTOTUNE)
 
         ds = ds.map(lambda img: self.check_dims(img,
                                                 self.input_size),
@@ -294,15 +295,16 @@ class DataLoader:
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
-                                               depth=num_classes))
+                                               depth=num_classes),
+                        num_parallel_calls=AUTOTUNE)
 
-        ds = ds.map(lambda img: tf.cast(img, img_type))
+        ds = ds.map(lambda img: tf.cast(img, img_type),
+                    num_parallel_calls=AUTOTUNE)
 
         if norm_bounds is not None:
             ds = ds.map(lambda img: self.norm_with_bounds(img,
                                                           norm_bounds),
-                        num_parallel_calls=AUTOTUNE
-                        )
+                        num_parallel_calls=AUTOTUNE)
 
         ds = ds.cache(cache_file)
 
