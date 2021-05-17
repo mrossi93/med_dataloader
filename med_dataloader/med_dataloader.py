@@ -201,7 +201,7 @@ class DataLoader:
                 self.is_A_RGB = dataset_property["is_A_RGB"]
                 self.is_B_RGB = dataset_property["is_B_RGB"]
                 self.is_B_categorical = dataset_property["is_B_categorical"]
-                self.num_classes = dataset_property["num_classes"]
+                self.num_classes = int(dataset_property["num_classes"])
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
 
@@ -281,6 +281,8 @@ class DataLoader:
                                                 ),
                     num_parallel_calls=AUTOTUNE)
 
+        # TODO move norm_bounds after every operations. In this way, if norm
+        # is necessary, the output type is forced to be float32
         if norm_bounds is not None:
             ds = ds.map(lambda img: self.norm_with_bounds(img,
                                                           norm_bounds),
