@@ -281,14 +281,6 @@ class DataLoader:
                                                 ),
                     num_parallel_calls=AUTOTUNE)
 
-        # TODO move norm_bounds after every operations. In this way, if norm
-        # is necessary, the output type is forced to be float32
-        if norm_bounds is not None:
-            ds = ds.map(lambda img: self.norm_with_bounds(img,
-                                                          norm_bounds),
-                        num_parallel_calls=AUTOTUNE
-                        )
-
         if self.is_3D:
             ds = ds.unbatch()
 
@@ -305,6 +297,13 @@ class DataLoader:
                                                depth=num_classes))
 
         ds = ds.map(lambda img: tf.cast(img, img_type))
+
+        if norm_bounds is not None:
+            ds = ds.map(lambda img: self.norm_with_bounds(img,
+                                                          norm_bounds),
+                        num_parallel_calls=AUTOTUNE
+                        )
+
         ds = ds.cache(cache_file)
 
         if not os.path.exists(index_file):
