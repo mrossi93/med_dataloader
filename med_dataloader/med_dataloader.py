@@ -39,6 +39,7 @@ class DataLoader:
         norm_boundsA=None,
         norm_boundsB=None,
         extract_only=None,
+        use_3D = False,
     ):
         """[summary]
 
@@ -66,6 +67,9 @@ class DataLoader:
                 if "Cache" folder is already populated, you need to clean this
                 folder content to recreate a partial cache file. When it is
                 set to None, the entire Dataset is cached. Defaults to None.
+            use_3D: Indicate whether to use three-dimensional data in the cache
+                (if True) or to extract two-dimensional slices from the 3D
+                volumes (if False). Defaults to False.
 
         Raises:
             FileNotFoundError: :py:attr:`data_dir` doesn't exists.
@@ -73,6 +77,7 @@ class DataLoader:
             FileNotFoundError: :py:attr:`imgA_label` doesn't exists.
             FileNotFoundError: :py:attr:`imgB_label` doesn't exists.
             ValueError: :py:attr:`cache_mode` is not "prod" nor "test".
+            ValueError: :py:attr:`use_3D` is not a Boolean value.
         """
 
         if mode not in __dataloader_modality__:
@@ -97,6 +102,10 @@ class DataLoader:
                 raise ValueError("input_size is None")
 
             self.input_size = input_size
+
+            if (not isinstance(use_3D, bool)):
+                raise ValueError("use_3D is not a Boolean value")
+            self.use_3D = use_3D
 
             if imgA_label is None or imgB_label is None:
                 raise ValueError("imgA_label or imgB_label is None.")
@@ -127,6 +136,10 @@ class DataLoader:
             else:
                 self.is_A_RGB = False
                 self.is_B_RGB = False
+            
+            if ((not self.is_3D) and (self.use_3D)):
+                raise ValueError("Image files are not 3D but use_3D was set to True")
+
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
             self.is_B_categorical = is_B_categorical
@@ -158,6 +171,7 @@ class DataLoader:
                                 "num_classes": self.num_classes,
                                 "norm_boundsA": self.norm_boundsA,
                                 "norm_boundsB": self.norm_boundsB,
+                                "use_3D": self.use_3D
                                 }
 
             output_dir_content = os.listdir(self.output_dir)
@@ -204,6 +218,7 @@ class DataLoader:
                 self.num_classes = dataset_property["num_classes"]
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
+                self.use_3D = dataset_property["use_3D"]
 
     def get_dataset(self,
                     batch_size=32,
@@ -216,14 +231,16 @@ class DataLoader:
                                                 img_label=self.imgA_label,
                                                 img_type=self.imgA_type,
                                                 is_RGB=self.is_A_RGB,
-                                                norm_bounds=self.norm_boundsA),
+                                                norm_bounds=self.norm_boundsA,
+                                                use_3D = self.use_3D),
                                   self.get_imgs(img_paths=self.imgB_paths,
                                                 img_label=self.imgB_label,
                                                 img_type=self.imgB_type,
                                                 is_RGB=self.is_B_RGB,
                                                 is_categorical=self.is_B_categorical,  # noqa
                                                 num_classes=self.num_classes,
-                                                norm_bounds=self.norm_boundsB)
+                                                norm_bounds=self.norm_boundsB,
+                                                use_3D = self.use_3D)
                                   ))
 
         if augmentation:
@@ -250,7 +267,8 @@ class DataLoader:
                  is_RGB,
                  is_categorical=False,
                  num_classes=None,
-                 norm_bounds=None):
+                 norm_bounds=None,
+                 use_3D = self.use_3D):
         """Open image files for one class and store it inside cache.
 
         This function performs all the(usually) slow reading operations that
@@ -280,6 +298,7 @@ class DataLoader:
                                                 [__dict_dtype__[img_type]],
                                                 ),
                     num_parallel_calls=AUTOTUNE)
+        
 
         if norm_bounds is not None:
             ds = ds.map(lambda img: self.norm_with_bounds(img,
@@ -287,10 +306,10 @@ class DataLoader:
                         num_parallel_calls=AUTOTUNE
                         )
 
-        if self.is_3D:
+        if self.is_3D and (not self.use_3D):
             ds = ds.unbatch()
 
-        if is_RGB:
+        if is_RGB and (not self.use_3D):
             ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
 
         ds = ds.map(lambda img: self.check_dims(img,
@@ -300,7 +319,7 @@ class DataLoader:
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
-                                               depth=num_classes))
+                                               depth=int(num_classes)))
 
         ds = ds.map(lambda img: tf.cast(img, img_type))
         ds = ds.cache(cache_file)
