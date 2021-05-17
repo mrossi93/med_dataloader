@@ -5,6 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import SimpleITK as sitk
 import json
+import numpy as np
 import sys
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -39,7 +40,7 @@ class DataLoader:
         norm_boundsA=None,
         norm_boundsB=None,
         extract_only=None,
-        use_3D = False,
+        use_3D=False,
     ):
         """[summary]
 
@@ -136,9 +137,10 @@ class DataLoader:
             else:
                 self.is_A_RGB = False
                 self.is_B_RGB = False
-            
+
             if ((not self.is_3D) and (self.use_3D)):
-                raise ValueError("Image files are not 3D but use_3D was set to True")
+                raise ValueError(
+                    "Image files are not 3D but use_3D was set to True")
 
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
@@ -231,16 +233,14 @@ class DataLoader:
                                                 img_label=self.imgA_label,
                                                 img_type=self.imgA_type,
                                                 is_RGB=self.is_A_RGB,
-                                                norm_bounds=self.norm_boundsA,
-                                                use_3D = self.use_3D),
+                                                norm_bounds=self.norm_boundsA),
                                   self.get_imgs(img_paths=self.imgB_paths,
                                                 img_label=self.imgB_label,
                                                 img_type=self.imgB_type,
                                                 is_RGB=self.is_B_RGB,
                                                 is_categorical=self.is_B_categorical,  # noqa
                                                 num_classes=self.num_classes,
-                                                norm_bounds=self.norm_boundsB,
-                                                use_3D = self.use_3D)
+                                                norm_bounds=self.norm_boundsB)
                                   ))
 
         if augmentation:
@@ -267,8 +267,7 @@ class DataLoader:
                  is_RGB,
                  is_categorical=False,
                  num_classes=None,
-                 norm_bounds=None,
-                 use_3D = self.use_3D):
+                 norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
         This function performs all the(usually) slow reading operations that
@@ -293,12 +292,12 @@ class DataLoader:
         index_file = f"{cache_file}.index"
 
         ds = tf.data.Dataset.from_tensor_slices(img_paths)
+
         ds = ds.map(lambda path: tf.py_function(self.open_img,
                                                 [path],
                                                 [__dict_dtype__[img_type]],
                                                 ),
                     num_parallel_calls=AUTOTUNE)
-        
 
         if norm_bounds is not None:
             ds = ds.map(lambda img: self.norm_with_bounds(img,
@@ -309,19 +308,22 @@ class DataLoader:
         if self.is_3D and (not self.use_3D):
             ds = ds.unbatch()
 
-        if is_RGB and (not self.use_3D):
+        if is_RGB:
             ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
 
-        ds = ds.map(lambda img: self.check_dims(img,
-                                                self.input_size),
+        # ds = ds.map(lambda img: self.check_dims(img,
+        #                                        self.input_size),
+        #            num_parallel_calls=AUTOTUNE)
+        ds = ds.map(lambda img: self.fix_image_dims(img,
+                                                    self.input_size),
                     num_parallel_calls=AUTOTUNE)
-
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
                                                depth=int(num_classes)))
 
         ds = ds.map(lambda img: tf.cast(img, img_type))
+
         ds = ds.cache(cache_file)
 
         if not os.path.exists(index_file):
@@ -376,6 +378,9 @@ class DataLoader:
         path = path.numpy().decode("utf-8")
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
+        if (self.use_3D):
+            image = np.transpose(image, axes=(2, 1, 0))
+
         tensor = tf.convert_to_tensor(image)
 
         return tensor
@@ -426,9 +431,25 @@ class DataLoader:
 
         return img
 
+    def fix_image_dims(self, img, size):
+        """
+        Fix tensor dimensions so that they are of the
+        proper size to carry out training/testing.
+        This function performs three steps:
+        - [Squeeze](https://www.tensorflow.org/api_docs/python/tf/squeeze) the tensor to remove dimensions of size 1
+        - [Expand](https://www.tensorflow.org/api_docs/python/tf/expand_dims) the dimensions of the tensor by adding one axis
+        - [Resize and pad](https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad) the tensor to a target width and height
+        """
+        img = tf.expand_dims(tf.squeeze(img), axis=-1)
+        if (not self.use_3D):
+            img = tf.image.resize_with_pad(img, size, size)
+        # else:
+        #    img = tf.image.resize_with_pad(img, size, size, size)
+        return img
     # -------------------------------------------------------------------------
     #  Transformations
     # -------------------------------------------------------------------------
+
     @ staticmethod
     def norm_with_bounds(image, bounds):
         """Image normalisation. Normalises image in the range defined by lb and
@@ -480,6 +501,7 @@ def generate_dataset(data_dir,
                      norm_boundsB=None,
                      is_B_categorical=False,
                      num_classes=None,
+                     use_3D=False,
                      ):
 
     data_loader = DataLoader(mode="gen",
@@ -493,6 +515,7 @@ def generate_dataset(data_dir,
                              norm_boundsA=norm_boundsA,
                              norm_boundsB=norm_boundsB,
                              extract_only=extract_only,
+                             use_3D=use_3D
                              )
 
     data_loader.get_dataset()
@@ -506,7 +529,7 @@ def get_dataset(data_dir,
                 train_augmentation=True,
                 random_crop_size=None,
                 random_rotate=True,
-                random_flip=True,
+                random_flip=True
                 ):
 
     if len(percentages) != 3:
