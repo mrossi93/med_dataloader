@@ -5,6 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import SimpleITK as sitk
 import json
+import numpy as np
 import sys
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -39,6 +40,7 @@ class DataLoader:
         norm_boundsA=None,
         norm_boundsB=None,
         extract_only=None,
+        use_3D=False,
     ):
         """[summary]
 
@@ -66,6 +68,9 @@ class DataLoader:
                 if "Cache" folder is already populated, you need to clean this
                 folder content to recreate a partial cache file. When it is
                 set to None, the entire Dataset is cached. Defaults to None.
+            use_3D: Indicate whether to use three-dimensional data in the cache
+                (if True) or to extract two-dimensional slices from the 3D
+                volumes (if False). Defaults to False.
 
         Raises:
             FileNotFoundError: :py:attr:`data_dir` doesn't exists.
@@ -73,6 +78,7 @@ class DataLoader:
             FileNotFoundError: :py:attr:`imgA_label` doesn't exists.
             FileNotFoundError: :py:attr:`imgB_label` doesn't exists.
             ValueError: :py:attr:`cache_mode` is not "prod" nor "test".
+            ValueError: :py:attr:`use_3D` is not a Boolean value.
         """
 
         if mode not in __dataloader_modality__:
@@ -97,6 +103,10 @@ class DataLoader:
                 raise ValueError("input_size is None")
 
             self.input_size = input_size
+
+            if (not isinstance(use_3D, bool)):
+                raise ValueError("use_3D is not a Boolean value")
+            self.use_3D = use_3D
 
             if imgA_label is None or imgB_label is None:
                 raise ValueError("imgA_label or imgB_label is None.")
@@ -127,6 +137,11 @@ class DataLoader:
             else:
                 self.is_A_RGB = False
                 self.is_B_RGB = False
+
+            if ((not self.is_3D) and (self.use_3D)):
+                raise ValueError(
+                    "Image files are not 3D but use_3D was set to True")
+
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
             self.is_B_categorical = is_B_categorical
@@ -158,6 +173,7 @@ class DataLoader:
                                 "num_classes": self.num_classes,
                                 "norm_boundsA": self.norm_boundsA,
                                 "norm_boundsB": self.norm_boundsB,
+                                "use_3D": self.use_3D
                                 }
 
             output_dir_content = os.listdir(self.output_dir)
@@ -204,6 +220,7 @@ class DataLoader:
                 self.num_classes = int(dataset_property["num_classes"])
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
+                self.use_3D = dataset_property["use_3D"]
 
     def get_dataset(self,
                     batch_size=32,
@@ -275,27 +292,30 @@ class DataLoader:
         index_file = f"{cache_file}.index"
 
         ds = tf.data.Dataset.from_tensor_slices(img_paths)
+
         ds = ds.map(lambda path: tf.py_function(self.open_img,
                                                 [path],
                                                 [__dict_dtype__[img_type]],
                                                 ),
                     num_parallel_calls=AUTOTUNE)
 
-        if self.is_3D:
+        if self.is_3D and (not self.use_3D):
             ds = ds.unbatch()
 
         if is_RGB:
             ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img),
                         num_parallel_calls=AUTOTUNE)
 
-        ds = ds.map(lambda img: self.check_dims(img,
-                                                self.input_size),
+        # ds = ds.map(lambda img: self.check_dims(img,
+        #                                        self.input_size),
+        #            num_parallel_calls=AUTOTUNE)
+        ds = ds.map(lambda img: self.fix_image_dims(img,
+                                                    self.input_size),
                     num_parallel_calls=AUTOTUNE)
-
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
-                                               depth=num_classes),
+                                               depth=int(num_classes))
                         num_parallel_calls=AUTOTUNE)
 
         ds = ds.map(lambda img: tf.cast(img, img_type),
@@ -360,6 +380,9 @@ class DataLoader:
         path = path.numpy().decode("utf-8")
         image = sitk.GetArrayFromImage(sitk.ReadImage(path))
 
+        if (self.use_3D):
+            image = np.transpose(image, axes=(2, 1, 0))
+
         tensor = tf.convert_to_tensor(image)
 
         return tensor
@@ -410,9 +433,32 @@ class DataLoader:
 
         return img
 
+    def fix_image_dims(self, img, size):
+        """Fix tensor dimensions so that they are of the
+        proper size to carry out Tensorflow operations.
+
+        This function performs three steps:
+        
+        #. `Squeeze <https://www.tensorflow.org/api_docs/python/tf/squeeze>`_ to remove axis with dimension of 1
+        #. `Expand <https://www.tensorflow.org/api_docs/python/tf/expand_dims>`_ the dimensions of the tensor by adding one axis
+        #. `Resize and pad <https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad>`_ the tensor to a target width and height
+        
+        If `use_3D` was enabled, volume is not resized and padded.
+
+        Args:
+            img: image or volume to be processed
+            size: desired size of image or volume in the two/three axis.
+
+
+        """
+        img = tf.expand_dims(tf.squeeze(img), axis=-1)
+        if (not self.use_3D):
+            img = tf.image.resize_with_pad(img, size, size)
+        return img
     # -------------------------------------------------------------------------
     #  Transformations
     # -------------------------------------------------------------------------
+
     @ staticmethod
     def norm_with_bounds(image, bounds):
         """Image normalisation. Normalises image in the range defined by lb and
@@ -464,6 +510,7 @@ def generate_dataset(data_dir,
                      norm_boundsB=None,
                      is_B_categorical=False,
                      num_classes=None,
+                     use_3D=False,
                      ):
 
     data_loader = DataLoader(mode="gen",
@@ -477,6 +524,7 @@ def generate_dataset(data_dir,
                              norm_boundsA=norm_boundsA,
                              norm_boundsB=norm_boundsB,
                              extract_only=extract_only,
+                             use_3D=use_3D
                              )
 
     data_loader.get_dataset()
@@ -490,7 +538,7 @@ def get_dataset(data_dir,
                 train_augmentation=True,
                 random_crop_size=None,
                 random_rotate=True,
-                random_flip=True,
+                random_flip=True
                 ):
 
     if len(percentages) != 3:

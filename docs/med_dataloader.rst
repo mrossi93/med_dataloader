@@ -4,6 +4,14 @@ med\_dataloader package
 Submodules
 ----------
 
+med\_dataloader.cli module
+--------------------------
+
+.. automodule:: med_dataloader.cli
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 med\_dataloader.med\_dataloader module
 --------------------------------------
 
