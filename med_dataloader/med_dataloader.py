@@ -432,19 +432,26 @@ class DataLoader:
         return img
 
     def fix_image_dims(self, img, size):
-        """
-        Fix tensor dimensions so that they are of the
-        proper size to carry out training/testing.
+        """Fix tensor dimensions so that they are of the
+        proper size to carry out Tensorflow operations.
+
         This function performs three steps:
-        - [Squeeze](https://www.tensorflow.org/api_docs/python/tf/squeeze) the tensor to remove dimensions of size 1
-        - [Expand](https://www.tensorflow.org/api_docs/python/tf/expand_dims) the dimensions of the tensor by adding one axis
-        - [Resize and pad](https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad) the tensor to a target width and height
+        
+        #. `Squeeze <https://www.tensorflow.org/api_docs/python/tf/squeeze>`_ to remove axis with dimension of 1
+        #. `Expand <https://www.tensorflow.org/api_docs/python/tf/expand_dims>`_ the dimensions of the tensor by adding one axis
+        #. `Resize and pad <https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad>`_ the tensor to a target width and height
+        
+        If `use_3D` was enabled, volume is not resized and padded.
+
+        Args:
+            img: image or volume to be processed
+            size: desired size of image or volume in the two/three axis.
+
+
         """
         img = tf.expand_dims(tf.squeeze(img), axis=-1)
         if (not self.use_3D):
             img = tf.image.resize_with_pad(img, size, size)
-        # else:
-        #    img = tf.image.resize_with_pad(img, size, size, size)
         return img
     # -------------------------------------------------------------------------
     #  Transformations
