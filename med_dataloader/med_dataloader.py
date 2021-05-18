@@ -217,7 +217,7 @@ class DataLoader:
                 self.is_A_RGB = dataset_property["is_A_RGB"]
                 self.is_B_RGB = dataset_property["is_B_RGB"]
                 self.is_B_categorical = dataset_property["is_B_categorical"]
-                self.num_classes = dataset_property["num_classes"]
+                self.num_classes = int(dataset_property["num_classes"])
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
                 self.use_3D = dataset_property["use_3D"]
@@ -299,17 +299,12 @@ class DataLoader:
                                                 ),
                     num_parallel_calls=AUTOTUNE)
 
-        if norm_bounds is not None:
-            ds = ds.map(lambda img: self.norm_with_bounds(img,
-                                                          norm_bounds),
-                        num_parallel_calls=AUTOTUNE
-                        )
-
         if self.is_3D and (not self.use_3D):
             ds = ds.unbatch()
 
         if is_RGB:
-            ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img))
+            ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img),
+                        num_parallel_calls=AUTOTUNE)
 
         # ds = ds.map(lambda img: self.check_dims(img,
         #                                        self.input_size),
@@ -320,9 +315,16 @@ class DataLoader:
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
-                                               depth=int(num_classes)))
+                                               depth=int(num_classes))
+                        num_parallel_calls=AUTOTUNE)
 
-        ds = ds.map(lambda img: tf.cast(img, img_type))
+        ds = ds.map(lambda img: tf.cast(img, img_type),
+                    num_parallel_calls=AUTOTUNE)
+
+        if norm_bounds is not None:
+            ds = ds.map(lambda img: self.norm_with_bounds(img,
+                                                          norm_bounds),
+                        num_parallel_calls=AUTOTUNE)
 
         ds = ds.cache(cache_file)
 
