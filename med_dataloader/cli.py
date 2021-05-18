@@ -43,6 +43,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
               type=click.INT,
               help="""Number of classes in case B folder contains categorical
               labels""")
+@click.option("-v", "--as_volumes",
+              is_flag=True,
+              default=False,
+              show_default=True,
+              required=False,
+              help="Set this flag to load data as 3D volumes.")
 @click.option("-o", "--output_dir",
               default=None,
               show_default=True,
@@ -58,7 +64,8 @@ def main(data_dir,
          size_input,
          bounds_a,
          bounds_b,
-         num_classes):
+         num_classes,
+         as_volumes):
     """Console script for med_dataloader."""
     click.echo(f"""\rGenerating dataset with following parameters:
     data_dir: {data_dir},
@@ -88,6 +95,7 @@ def main(data_dir,
                      num_classes=num_classes,
                      norm_boundsA=bounds_a,
                      norm_boundsB=bounds_b,
+                     use_3D=as_volumes,
                      )
 
     return 0

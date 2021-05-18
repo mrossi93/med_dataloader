@@ -58,11 +58,6 @@ class DataLoader:
                 folder that actually contains :py:attr:`imgA_label` and
                 :py:attr:`imgB_label` subfolders. It's a subfolder of Defaults
                 to 'Images'.
-            cache_mode (str, optional): One between "prod" or "test". "test" is
-                used as a debug modality only in case you want to create Cache
-                directory at the current folder location. "prod" creates a
-                subfolder named "Cache" inside :py:attr:`data_dir`. Defaults to
-                "prod".
             extract_only (int, optional): Indicate wheter to partially cache a
                 certain amount of elements in the dataset. Please remember that
                 if "Cache" folder is already populated, you need to clean this
@@ -217,7 +212,7 @@ class DataLoader:
                 self.is_A_RGB = dataset_property["is_A_RGB"]
                 self.is_B_RGB = dataset_property["is_B_RGB"]
                 self.is_B_categorical = dataset_property["is_B_categorical"]
-                self.num_classes = int(dataset_property["num_classes"])
+                self.num_classes = dataset_property["num_classes"]
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
                 self.use_3D = dataset_property["use_3D"]
@@ -312,10 +307,11 @@ class DataLoader:
         ds = ds.map(lambda img: self.fix_image_dims(img,
                                                     self.input_size),
                     num_parallel_calls=AUTOTUNE)
+
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
                                                                   img_type)),
-                                               depth=int(num_classes))
+                                               depth=int(num_classes)),
                         num_parallel_calls=AUTOTUNE)
 
         ds = ds.map(lambda img: tf.cast(img, img_type),
@@ -423,26 +419,18 @@ class DataLoader:
 
         img_type = image.dtype.name
 
-        # return __dict_dtype__[img_type]
         return img_type
-
-    @ staticmethod
-    def check_dims(img, size):
-        img = tf.expand_dims(tf.squeeze(img), axis=-1)
-        img = tf.image.resize_with_pad(img, size, size)
-
-        return img
 
     def fix_image_dims(self, img, size):
         """Fix tensor dimensions so that they are of the
         proper size to carry out Tensorflow operations.
 
         This function performs three steps:
-        
+
         #. `Squeeze <https://www.tensorflow.org/api_docs/python/tf/squeeze>`_ to remove axis with dimension of 1
         #. `Expand <https://www.tensorflow.org/api_docs/python/tf/expand_dims>`_ the dimensions of the tensor by adding one axis
         #. `Resize and pad <https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad>`_ the tensor to a target width and height
-        
+
         If `use_3D` was enabled, volume is not resized and padded.
 
         Args:
@@ -455,6 +443,7 @@ class DataLoader:
         if (not self.use_3D):
             img = tf.image.resize_with_pad(img, size, size)
         return img
+
     # -------------------------------------------------------------------------
     #  Transformations
     # -------------------------------------------------------------------------
