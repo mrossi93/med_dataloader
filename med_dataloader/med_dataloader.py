@@ -30,9 +30,9 @@ class DataLoader:
     def __init__(
         self,
         mode,
-        input_size=None,
         imgA_label=None,
         imgB_label=None,
+        input_size=None,
         data_dir="./Data",
         output_dir=None,
         is_B_categorical=False,
@@ -45,35 +45,45 @@ class DataLoader:
         """[summary]
 
         Args:
+            mode ([type]): [description]
             imgA_label (str): Identifier for class A. It's the name of the
-                folder inside :py:attr:`imgs_subdir` that contains images
+                folder inside :py:attr:`data_dir` that contains images
                 labeled as class A.
             imgB_label (str): Identifier for class B. It's the name of the
-                folder inside :py:attr:`imgs_subdir` that contains images
+                folder inside :py:attr:`data_dir` that contains images
                 labeled as class B.
-            data_dir (str, optional): Path to directory that contains the
-                Dataset. This folder **must** contain a subfolder named like
-                :py:attr:`imgs_subdir`. Defaults to './Data'.
-            imgs_subdir (str, optional): Name (**not** the entire path) of the
-                folder that actually contains :py:attr:`imgA_label` and
-                :py:attr:`imgB_label` subfolders. It's a subfolder of Defaults
-                to 'Images'.
+            input_size (int): Dimension of a single image, defined as 
+                input_size x input_size. Currently, it supports only squared
+                images.
+            data_dir (str, optional): Path to directory that contains the 
+                Dataset. This folder **must** contain two subfolders named like
+                :py:attr:`imgA_label` and :py:attr:`imgB_label`. Defaults to 
+                './Data'.
+            output_dir ([type], optional): [description]. Defaults to None.
+            is_B_categorical (bool, optional): [description]. Defaults to False.
+            num_classes ([type], optional): [description]. Defaults to None.
+            norm_boundsA ([type], optional): [description]. Defaults to None.
+            norm_boundsB ([type], optional): [description]. Defaults to None.
             extract_only (int, optional): Indicate wheter to partially cache a
                 certain amount of elements in the dataset. Please remember that
-                if "Cache" folder is already populated, you need to clean this
-                folder content to recreate a partial cache file. When it is
-                set to None, the entire Dataset is cached. Defaults to None.
+                if :py:attr:`output_dir` folder is already populated, you need
+                to clean this folder content to recreate a partial cache file.
+                When it is set to None, the entire Dataset is cached. Defaults
+                to None.
             use_3D: Indicate whether to use three-dimensional data in the cache
                 (if True) or to extract two-dimensional slices from the 3D
                 volumes (if False). Defaults to False.
 
         Raises:
-            FileNotFoundError: :py:attr:`data_dir` doesn't exists.
-            FileNotFoundError: :py:attr:`imgs_subdir` doesn't exists.
-            FileNotFoundError: :py:attr:`imgA_label` doesn't exists.
-            FileNotFoundError: :py:attr:`imgB_label` doesn't exists.
-            ValueError: :py:attr:`cache_mode` is not "prod" nor "test".
-            ValueError: :py:attr:`use_3D` is not a Boolean value.
+            ValueError: [description]
+            FileNotFoundError: [description]
+            ValueError: [description]
+            FileNotFoundError: [description]
+            FileNotFoundError: [description]
+            ValueError: [description]
+            ValueError: [description]
+            ValueError: [description]
+            FileNotFoundError: [description]
         """
 
         if mode not in __dataloader_modality__:
@@ -265,10 +275,10 @@ class DataLoader:
                  norm_bounds=None):
         """Open image files for one class and store it inside cache.
 
-        This function performs all the(usually) slow reading operations that
+        This function performs all the (usually) slow reading operations that
         is necessary to execute at least the first time. After the first
         execution information are saved inside some cache file inside Cache
-        folder(typically created in your Dataset folder, at the same level of
+        folder (typically created in your Dataset folder, at the same level of
         Images folder). This function detects if cache files are already
         present, and in that case it skips the definition of these files.
         Please take into account that cache files will be as big as your
