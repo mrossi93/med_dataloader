@@ -52,12 +52,12 @@ class DataLoader:
             imgB_label (str): Identifier for class B. It's the name of the
                 folder inside :py:attr:`data_dir` that contains images
                 labeled as class B.
-            input_size (int): Dimension of a single image, defined as 
+            input_size (int): Dimension of a single image, defined as
                 input_size x input_size. Currently, it supports only squared
                 images.
-            data_dir (str, optional): Path to directory that contains the 
+            data_dir (str, optional): Path to directory that contains the
                 Dataset. This folder **must** contain two subfolders named like
-                :py:attr:`imgA_label` and :py:attr:`imgB_label`. Defaults to 
+                :py:attr:`imgA_label` and :py:attr:`imgB_label`. Defaults to
                 './Data'.
             output_dir ([type], optional): [description]. Defaults to None.
             is_B_categorical (bool, optional): [description]. Defaults to False.
@@ -465,8 +465,8 @@ class DataLoader:
         lb = tf.cast(bounds[0], dtype=image.dtype)
         ub = tf.cast(bounds[1], dtype=image.dtype)
 
-        tf.where(image < lb, lb, image)
-        tf.where(image > ub, ub, image)
+        image = tf.where(image < lb, lb, image)
+        image = tf.where(image > ub, ub, image)
 
         image = image - lb
         image /= (ub - lb)
