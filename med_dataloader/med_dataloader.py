@@ -166,7 +166,7 @@ class DataLoader:
             else:
                 self.norm_boundsB = norm_boundsB
 
-            dataset_property = {"is3D": True,
+            dataset_property = {"is_3D": self.is_3D,
                                 "input_size": self.input_size,
                                 "imgA_label": self.imgA_label,
                                 "imgB_label": self.imgB_label,
@@ -213,7 +213,7 @@ class DataLoader:
             with open(os.path.join(self.output_dir,
                                    "ds_property.json"), 'r') as property_file:
                 dataset_property = json.load(property_file)
-                self.is_3D = dataset_property["is3D"]
+                self.is_3D = dataset_property["is_3D"]
                 self.input_size = dataset_property["input_size"]
                 self.imgA_label = dataset_property["imgA_label"]
                 self.imgB_label = dataset_property["imgB_label"]
