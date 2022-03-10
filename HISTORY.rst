@@ -2,6 +2,11 @@
 History
 =======
 
+0.1.13 (2022-03-10)
+-------------------
+
+* New function: now dataset can be generated also by reading a json file containing list of file paths.
+
 0.1.12 (2021-10-29)
 -------------------
 
