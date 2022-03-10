@@ -30,10 +30,10 @@ class DataLoader:
     def __init__(
         self,
         mode,
+        data_path,
         imgA_label=None,
         imgB_label=None,
         input_size=None,
-        data_dir="./Data",
         output_dir=None,
         is_B_categorical=False,
         num_classes=None,
@@ -92,17 +92,58 @@ class DataLoader:
         self.mode = mode
 
         if mode == "gen":
-            if not os.path.exists(data_dir):
-                raise FileNotFoundError(f"{data_dir} does not exist")
+            dir_mode = False
+            file_mode = False
 
-            self.data_dir = data_dir
+            if os.path.isdir(data_path):
+                if not os.path.exists(data_path):
+                    raise FileNotFoundError(f"{data_path} does not exist")
+                else:
+                    dir_mode = True
+            else:
+                if not os.path.exists(data_path):
+                    raise FileNotFoundError(f"{data_path} does not exist")
+                else:
+                    file_mode = True
+
+            self.data_path = data_path
 
             if output_dir is None:
-                self.output_dir = os.path.join(os.path.dirname(data_dir),
-                                               f"{os.path.basename(data_dir)}_TF")  # noqa
+                if dir_mode:
+                    self.output_dir = os.path.join(os.path.dirname(self.data_path),
+                                                   f"{os.path.basename(self.data_path)}_TF")
+                elif file_mode:
+                    base_dirname = os.path.dirname(self.data_path)
+                    output_dirname = os.path.basename(
+                        self.data_path).replace(".json", "_TF")
+                    self.output_dir = os.path.join(
+                        base_dirname, output_dirname)
             else:
                 self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
+
+            if imgA_label is None or imgB_label is None:
+                raise ValueError("imgA_label or imgB_label is None.")
+
+            self.imgA_label = imgA_label
+            self.imgB_label = imgB_label
+
+            if dir_mode:
+                if not os.path.exists(os.path.join(data_path,
+                                                   imgA_label)):
+                    raise FileNotFoundError(f"{imgA_label} does not exist")
+
+                if not os.path.exists(os.path.join(data_path,
+                                                   imgB_label)):
+                    raise FileNotFoundError(f"{imgB_label} does not exist")
+
+                self.imgA_paths, self.imgB_paths = self.get_imgs_paths()
+            elif file_mode:
+                self.imgA_paths, self.imgB_paths = self.read_imgs_paths()
+
+            if extract_only is not None:
+                self.imgA_paths = self.imgA_paths[:extract_only]
+                self.imgB_paths = self.imgB_paths[:extract_only]
 
             if input_size is None:
                 raise ValueError("input_size is None")
@@ -112,26 +153,6 @@ class DataLoader:
             if (not isinstance(use_3D, bool)):
                 raise ValueError("use_3D is not a Boolean value")
             self.use_3D = use_3D
-
-            if imgA_label is None or imgB_label is None:
-                raise ValueError("imgA_label or imgB_label is None.")
-
-            self.imgA_label = imgA_label
-            self.imgB_label = imgB_label
-
-            if not os.path.exists(os.path.join(data_dir,
-                                               imgA_label)):
-                raise FileNotFoundError(f"{imgA_label} does not exist")
-
-            if not os.path.exists(os.path.join(data_dir,
-                                               imgB_label)):
-                raise FileNotFoundError(f"{imgB_label} does not exist")
-
-            self.imgA_paths, self.imgB_paths = self.get_imgs_paths()
-
-            if extract_only is not None:
-                self.imgA_paths = self.imgA_paths[:extract_only]
-                self.imgB_paths = self.imgB_paths[:extract_only]
 
             self.is_3D = self.is_3D_data(self.imgA_paths[0])
             if self.is_3D:
@@ -203,9 +224,9 @@ class DataLoader:
                     json.dump(dataset_property, property_file, indent=2)
 
         elif mode == "get":
-            if not os.path.exists(data_dir):
-                raise FileNotFoundError(f"{data_dir} does not exist")
-            self.output_dir = data_dir
+            if not os.path.exists(data_path) or (not os.path.isdir(data_path)):
+                raise FileNotFoundError(f"{data_path} does not exist")
+            self.output_dir = data_path
 
             # dummy variables for images path
             self.imgA_paths = []
@@ -348,7 +369,6 @@ class DataLoader:
                 when images are named with a progressive number inside a folder
                 (e.g.: 001.xxx, 002.xxx, ..., 999.xxx)
         """
-        # print("Fetching images paths...")
         subset_dir_imgA = os.path.join(self.data_dir, self.imgA_label)
         subset_dir_imgB = os.path.join(self.data_dir, self.imgB_label)
 
@@ -360,11 +380,30 @@ class DataLoader:
         paths_imgB = [os.path.join(subset_dir_imgB, img)
                       for img in filenames_imgB]
 
-        # print("Images paths collected.")
-
         # Sort paths alphabetically
         paths_imgA.sort()
         paths_imgB.sort()
+
+        if len(paths_imgA) != len(paths_imgB):
+            raise ValueError(
+                f"Dimension mismatch: {len(paths_imgA)} != {len(paths_imgB)}")
+
+        return paths_imgA, paths_imgB
+
+    def read_imgs_paths(self):
+        """Read paths of every single image divided by classes from a json file.
+
+        Returns:
+            list, list: two list containing the paths of every images for both
+                classes. The list is sorted alphabetically, this can be usefull
+                when images are named with a progressive number inside a folder
+                (e.g.: 001.xxx, 002.xxx, ..., 999.xxx)
+        """
+        with open(self.data_path, 'r') as f:
+            dataset_paths = json.load(f)
+
+        paths_imgA = dataset_paths[self.imgA_label]
+        paths_imgB = dataset_paths[self.imgB_label]
 
         if len(paths_imgA) != len(paths_imgB):
             raise ValueError(
@@ -437,9 +476,9 @@ class DataLoader:
 
         This function performs three steps:
 
-        #. `Squeeze <https://www.tensorflow.org/api_docs/python/tf/squeeze>`_ to remove axis with dimension of 1
-        #. `Expand <https://www.tensorflow.org/api_docs/python/tf/expand_dims>`_ the dimensions of the tensor by adding one axis
-        #. `Resize and pad <https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad>`_ the tensor to a target width and height
+        # . `Squeeze <https://www.tensorflow.org/api_docs/python/tf/squeeze>`_ to remove axis with dimension of 1
+        # . `Expand <https://www.tensorflow.org/api_docs/python/tf/expand_dims>`_ the dimensions of the tensor by adding one axis
+        # . `Resize and pad <https://www.tensorflow.org/api_docs/python/tf/image/resize_with_pad>`_ the tensor to a target width and height
 
         If `use_3D` was enabled, volume is not resized and padded.
 
@@ -499,7 +538,7 @@ class DataLoader:
         return imgA, imgB
 
 
-def generate_dataset(data_dir,
+def generate_dataset(data_path,
                      imgA_label,
                      imgB_label,
                      input_size,
@@ -513,10 +552,10 @@ def generate_dataset(data_dir,
                      ):
 
     data_loader = DataLoader(mode="gen",
+                             data_path=data_path,
                              input_size=input_size,
                              imgA_label=imgA_label,
                              imgB_label=imgB_label,
-                             data_dir=data_dir,
                              output_dir=output_dir,
                              is_B_categorical=is_B_categorical,
                              num_classes=num_classes,
@@ -547,7 +586,7 @@ def get_dataset(data_dir,
         raise ValueError("Sum of percentages has to be 1")
 
     data_loader = DataLoader(mode="get",
-                             data_dir=data_dir,
+                             data_path=data_dir,
                              )
 
     complete_ds = data_loader.get_dataset(batch_size=batch_size,
@@ -560,7 +599,7 @@ def get_dataset(data_dir,
 
     # Compute length of dataset
     num_imgs = 0
-    for img in complete_ds:
+    for _ in complete_ds:
         num_imgs += 1
 
     train_ends = int(num_imgs * percentages[0])
