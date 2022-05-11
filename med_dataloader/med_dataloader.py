@@ -148,6 +148,9 @@ class DataLoader:
             if img_size is None:
                 raise ValueError("img_size is None")
 
+            if img_size % 2 != 0:
+                img_size += 1
+
             self.img_size = img_size
 
             if (not isinstance(use_3D, bool)):
