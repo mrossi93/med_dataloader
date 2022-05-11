@@ -33,7 +33,7 @@ class DataLoader:
         data_path,
         imgA_label=None,
         imgB_label=None,
-        input_size=None,
+        img_size=None,
         output_dir=None,
         is_B_categorical=False,
         num_classes=None,
@@ -52,8 +52,8 @@ class DataLoader:
             imgB_label (str): Identifier for class B. It's the name of the
                 folder inside :py:attr:`data_dir` that contains images
                 labeled as class B.
-            input_size (int): Dimension of a single image, defined as
-                input_size x input_size. Currently, it supports only squared
+            img_size (int): Dimension of a single image, defined as
+                img_size x img_size. Currently, it supports only squared
                 images.
             data_dir (str, optional): Path to directory that contains the
                 Dataset. This folder **must** contain two subfolders named like
@@ -145,10 +145,10 @@ class DataLoader:
                 self.imgA_paths = self.imgA_paths[:extract_only]
                 self.imgB_paths = self.imgB_paths[:extract_only]
 
-            if input_size is None:
-                raise ValueError("input_size is None")
+            if img_size is None:
+                raise ValueError("img_size is None")
 
-            self.input_size = input_size
+            self.img_size = img_size
 
             if (not isinstance(use_3D, bool)):
                 raise ValueError("use_3D is not a Boolean value")
@@ -188,7 +188,7 @@ class DataLoader:
                 self.norm_boundsB = norm_boundsB
 
             dataset_property = {"is_3D": self.is_3D,
-                                "input_size": self.input_size,
+                                "img_size": self.img_size,
                                 "imgA_label": self.imgA_label,
                                 "imgB_label": self.imgB_label,
                                 "imgA_type": self.imgA_type,
@@ -235,7 +235,7 @@ class DataLoader:
                                    "ds_property.json"), 'r') as property_file:
                 dataset_property = json.load(property_file)
                 self.is_3D = dataset_property["is_3D"]
-                self.input_size = dataset_property["input_size"]
+                self.img_size = dataset_property["img_size"]
                 self.imgA_label = dataset_property["imgA_label"]
                 self.imgB_label = dataset_property["imgB_label"]
                 self.imgA_type = dataset_property["imgA_type"]
@@ -333,11 +333,13 @@ class DataLoader:
                         num_parallel_calls=AUTOTUNE)
 
         # ds = ds.map(lambda img: self.check_dims(img,
-        #                                        self.input_size),
+        #                                        self.img_size),
         #            num_parallel_calls=AUTOTUNE)
         ds = ds.map(lambda img: self.fix_image_dims(img,
-                                                    self.input_size),
+                                                    self.img_size),
                     num_parallel_calls=AUTOTUNE)
+
+        # TODO: add patches
 
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
@@ -554,7 +556,7 @@ class DataLoader:
 def generate_dataset(data_path,
                      imgA_label,
                      imgB_label,
-                     input_size,
+                     img_size,
                      output_dir=None,
                      extract_only=None,
                      norm_boundsA=None,
@@ -566,7 +568,7 @@ def generate_dataset(data_path,
 
     data_loader = DataLoader(mode="gen",
                              data_path=data_path,
-                             input_size=input_size,
+                             img_size=img_size,
                              imgA_label=imgA_label,
                              imgB_label=imgB_label,
                              output_dir=output_dir,
