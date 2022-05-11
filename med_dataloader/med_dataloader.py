@@ -487,7 +487,6 @@ class DataLoader:
             img: image or volume to be processed
             size: desired size of image or volume in the two/three axis.
 
-
         """
         # Pad image
         current_size = tf.shape(img)
