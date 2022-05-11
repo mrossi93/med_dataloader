@@ -369,8 +369,8 @@ class DataLoader:
                 when images are named with a progressive number inside a folder
                 (e.g.: 001.xxx, 002.xxx, ..., 999.xxx)
         """
-        subset_dir_imgA = os.path.join(self.data_dir, self.imgA_label)
-        subset_dir_imgB = os.path.join(self.data_dir, self.imgB_label)
+        subset_dir_imgA = os.path.join(self.data_path, self.imgA_label)
+        subset_dir_imgB = os.path.join(self.data_path, self.imgB_label)
 
         filenames_imgA = os.listdir(subset_dir_imgA)
         filenames_imgB = os.listdir(subset_dir_imgB)
@@ -427,6 +427,7 @@ class DataLoader:
 
         if (self.use_3D):
             image = np.transpose(image, axes=(2, 1, 0))
+            # TODO check the correct orientation for axis
 
         tensor = tf.convert_to_tensor(image)
 
@@ -488,9 +489,22 @@ class DataLoader:
 
 
         """
-        img = tf.expand_dims(tf.squeeze(img), axis=-1)
-        if (not self.use_3D):
-            img = tf.image.resize_with_pad(img, size, size)
+        # Pad image
+        current_size = tf.shape(img)
+        diff = (size - current_size) // 2
+        pad_amount = tf.where(diff > 0, diff, 0)
+        pad_amount = tf.expand_dims(pad_amount, axis=-1)
+        paddings = tf.repeat(pad_amount, 2, axis=1)
+        img = tf.pad(img, paddings=paddings)
+
+        # Crop image
+        current_size = tf.shape(img)
+        diff = (size - current_size) // 2
+        crop_begins = tf.where(diff < 0, -diff, 0)
+        crop_ends = tf.repeat(size, tf.shape(crop_begins))
+        img = tf.slice(img, crop_begins, crop_ends)
+
+        img = tf.expand_dims(img, axis=-1)
         return img
 
     # -------------------------------------------------------------------------
