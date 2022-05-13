@@ -1,6 +1,7 @@
 """Main module."""
 
 import os
+from unittest.mock import patch
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import SimpleITK as sitk
@@ -41,6 +42,8 @@ class DataLoader:
         norm_boundsB=None,
         extract_only=None,
         use_3D=False,
+        patch_size=None,
+        patch_overlap=0.0,
     ):
         """[summary]
 
@@ -190,6 +193,20 @@ class DataLoader:
             else:
                 self.norm_boundsB = norm_boundsB
 
+            if self.is_3D and self.use_3D and patch_size is not None:
+                if patch_size > img_size:
+                    raise ValueError(
+                        "patch_size must be lower than img_size.")
+                if patch_overlap < 0.0 or patch_overlap > 1.0:
+                    raise ValueError(
+                        "patch_overlap must be declared as a value between 0 and 1 representing the desidered overlap percentage.")  # noqa
+            else:
+                patch_size = None
+                patch_overlap = 0.0
+
+            self.patch_size = patch_size
+            self.patch_overlap = patch_overlap
+
             dataset_property = {"is_3D": self.is_3D,
                                 "img_size": self.img_size,
                                 "imgA_label": self.imgA_label,
@@ -202,7 +219,9 @@ class DataLoader:
                                 "num_classes": self.num_classes,
                                 "norm_boundsA": self.norm_boundsA,
                                 "norm_boundsB": self.norm_boundsB,
-                                "use_3D": self.use_3D
+                                "use_3D": self.use_3D,
+                                "patch_size": self.patch_size,
+                                "patch_overlap": self.patch_overlap
                                 }
 
             output_dir_content = os.listdir(self.output_dir)
@@ -250,6 +269,8 @@ class DataLoader:
                 self.norm_boundsA = dataset_property["norm_boundsA"]
                 self.norm_boundsB = dataset_property["norm_boundsB"]
                 self.use_3D = dataset_property["use_3D"]
+                self.patch_size = dataset_property["patch_size"]
+                self.patch_overlap = dataset_property["patch_overlap"]
 
     def get_dataset(self,
                     batch_size=32,
@@ -335,14 +356,13 @@ class DataLoader:
             ds = ds.map(lambda img: tf.image.rgb_to_grayscale(img),
                         num_parallel_calls=AUTOTUNE)
 
-        # ds = ds.map(lambda img: self.check_dims(img,
-        #                                        self.img_size),
-        #            num_parallel_calls=AUTOTUNE)
-        ds = ds.map(lambda img: self.fix_image_dims(img,
-                                                    self.img_size),
+        ds = ds.map(lambda img: self.fix_image_dims(img),
                     num_parallel_calls=AUTOTUNE)
 
-        # TODO: add patches
+        if self.patch_size is not None:
+            ds = ds.map(lambda img: self.patch_volume(img),
+                        num_parallel_calls=AUTOTUNE)
+            ds = ds.unbatch()
 
         if is_categorical:
             ds = ds.map(lambda img: tf.one_hot(tf.squeeze(tf.cast(img,
@@ -476,7 +496,7 @@ class DataLoader:
 
         return img_type
 
-    def fix_image_dims(self, img, size):
+    def fix_image_dims(self, img):
         """Fix tensor dimensions so that they are of the
         proper size to carry out Tensorflow operations.
 
@@ -490,12 +510,11 @@ class DataLoader:
 
         Args:
             img: image or volume to be processed
-            size: desired size of image or volume in the two/three axis.
 
         """
         # Pad image
         current_size = tf.shape(img)
-        diff = (size - current_size) // 2
+        diff = (self.img_size - current_size) // 2
         pad_amount = tf.where(diff > 0, diff, 0)
         pad_amount = tf.expand_dims(pad_amount, axis=-1)
         paddings = tf.repeat(pad_amount, 2, axis=1)
@@ -503,11 +522,30 @@ class DataLoader:
 
         # Crop image
         current_size = tf.shape(img)
-        diff = (size - current_size) // 2
+        diff = (self.img_size - current_size) // 2
         crop_begins = tf.where(diff < 0, -diff, 0)
-        crop_ends = tf.repeat(size, tf.shape(crop_begins))
+        crop_ends = tf.repeat(self.img_size, tf.shape(crop_begins))
         img = tf.slice(img, crop_begins, crop_ends)
 
+        img = tf.expand_dims(img, axis=-1)
+        return img
+
+    def patch_volume(self, img):
+        overlap_size = int(self.patch_size * self.patch_overlap)
+        ksizes = [1,
+                  self.patch_size,
+                  self.patch_size,
+                  self.patch_size,
+                  1]
+        strides = [1,
+                   self.patch_size - overlap_size,
+                   self.patch_size - overlap_size,
+                   self.patch_size - overlap_size,
+                   1]
+        img = tf.expand_dims(img, axis=0)
+        img = tf.extract_volume_patches(img, ksizes, strides, 'VALID')
+        img = tf.reshape(img,
+                         [-1, self.patch_size, self.patch_size, self.patch_size])
         img = tf.expand_dims(img, axis=-1)
         return img
 
@@ -567,6 +605,8 @@ def generate_dataset(data_path,
                      is_B_categorical=False,
                      num_classes=None,
                      use_3D=False,
+                     patch_size=None,
+                     patch_overlap=0,
                      ):
 
     data_loader = DataLoader(mode="gen",
@@ -580,7 +620,9 @@ def generate_dataset(data_path,
                              norm_boundsA=norm_boundsA,
                              norm_boundsB=norm_boundsB,
                              extract_only=extract_only,
-                             use_3D=use_3D
+                             use_3D=use_3D,
+                             patch_size=patch_size,
+                             patch_overlap=patch_overlap,
                              )
 
     data_loader.get_dataset()
