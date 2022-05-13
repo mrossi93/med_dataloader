@@ -147,15 +147,7 @@ class DataLoader:
                 self.imgA_paths = self.imgA_paths[:extract_only]
                 self.imgB_paths = self.imgB_paths[:extract_only]
 
-            if img_size is None:
-                raise ValueError("img_size is None")
-
-            if img_size % 2 != 0:
-                img_size += 1
-
-            self.img_size = img_size
-
-            if (not isinstance(use_3D, bool)):
+            if not isinstance(use_3D, bool):
                 raise ValueError("use_3D is not a Boolean value")
             self.use_3D = use_3D
 
@@ -172,6 +164,32 @@ class DataLoader:
             if ((not self.is_3D) and (self.use_3D)):
                 raise ValueError(
                     "Image files are not 3D but use_3D was set to True")
+
+            if img_size is None:
+                raise ValueError("img_size is None")
+            elif isinstance(img_size, int):
+                img_size = [img_size]
+                if self.is_3D and self.use_3D:
+                    img_size = img_size * 3
+                else:
+                    img_size = img_size * 2
+            elif isinstance(img_size, list):
+                if self.is_3D and self.use_3D:
+                    if len(img_size) != 3:
+                        raise ValueError(
+                            "img_size must be declared as a 3-elements list or a single integer value when use_3D is True.")  # noqa
+                else:
+                    if len(img_size) != 2:
+                        raise ValueError(
+                            "img_size must be declared as a 2-elements list or a single integer value when use_3D is False.")  # noqa
+            else:
+                raise ValueError(
+                    "img_size must be declared as a list or a single integer value.")
+
+            # Fix even sizes
+            img_size = [x + 1 if x % 2 != 0 else x for x in img_size]
+
+            self.img_size = img_size
 
             self.imgA_type = self.check_type(self.imgA_paths[0])
             self.imgB_type = self.check_type(self.imgB_paths[0])
@@ -193,7 +211,9 @@ class DataLoader:
                 self.norm_boundsB = norm_boundsB
 
             if self.is_3D and self.use_3D and patch_size is not None:
-                if patch_size > img_size:
+                if patch_size > img_size[0] or \
+                   patch_size > img_size[1] or \
+                   patch_size > img_size[2]:
                     raise ValueError(
                         "patch_size must be lower than img_size.")
                 if patch_overlap < 0.0 or patch_overlap > 1.0:
@@ -523,7 +543,8 @@ class DataLoader:
         current_size = tf.shape(img)
         diff = (self.img_size - current_size) // 2
         crop_begins = tf.where(diff < 0, -diff, 0)
-        crop_ends = tf.repeat(self.img_size, tf.shape(crop_begins))
+        # crop_ends = tf.repeat(self.img_size, tf.shape(crop_begins))
+        crop_ends = self.img_size
         img = tf.slice(img, crop_begins, crop_ends)
 
         img = tf.expand_dims(img, axis=-1)
