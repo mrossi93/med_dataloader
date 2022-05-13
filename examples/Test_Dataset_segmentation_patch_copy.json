@@ -1,8 +1,0 @@
-{
-  "CT": [
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\CT\\prova.mha"
-  ],
-  "Labels": [
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\Labels\\prova.mha"
-  ]
-}

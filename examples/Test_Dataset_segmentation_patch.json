@@ -1,12 +1,12 @@
 {
   "CT": [
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\CT\\volumeCT_reshape_knee_192_192_192_0001.mha",
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\CT\\volumeCT_reshape_knee_192_192_192_0002.mha",
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\CT\\volumeCT_reshape_knee_192_192_192_0003.mha"
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\CT\\volumeCT_reshape_knee_192_192_192_0001.nii",
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\CT\\volumeCT_reshape_knee_192_192_192_0002.nii",
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\CT\\volumeCT_reshape_knee_192_192_192_0003.nii"
   ],
   "Labels": [
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\Labels\\volumeLabel_femur_tibia_192_192_192_0001.mha",
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\Labels\\volumeLabel_femur_tibia_192_192_192_0002.mha",
-    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation_patch\\Labels\\volumeLabel_femur_tibia_192_192_192_0003.mha"
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\Labels\\volumeLabel_femur_tibia_192_192_192_0001.nii",
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\Labels\\volumeLabel_femur_tibia_192_192_192_0002.nii",
+    "C:\\Users\\rossi\\Programming\\python_packages\\med_dataloader\\examples\\Test_Dataset_segmentation\\Labels\\volumeLabel_femur_tibia_192_192_192_0003.nii"
   ]
 }
