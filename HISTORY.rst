@@ -2,6 +2,17 @@
 History
 =======
 
+0.1.14 (2022-05-16)
+-------------------
+
+* Improved handling of img_size parameters for both 2D and 3D images.
+  
+  * User can now declare img_size as a 2- or 3-elements list.
+  
+  * Automatic zero-padding or center-based cropping is performed to adapt the size of the image to the declare img_size parameter.
+
+* New features: 3D volumes can be patched into smaller cubic patches. Overlapping between patches is also supported.
+
 0.1.13 (2022-03-10)
 -------------------
 
