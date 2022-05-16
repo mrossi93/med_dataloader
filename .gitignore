@@ -1,5 +1,6 @@
 data/*
 examples/*_TF
+examples/*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
