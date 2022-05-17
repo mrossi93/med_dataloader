@@ -166,7 +166,7 @@ class DataLoader:
                     "Image files are not 3D but use_3D was set to True")
 
             if img_size is None:
-                raise ValueError("img_size is None")
+                pass
             elif isinstance(img_size, int):
                 img_size = [img_size]
                 if self.is_3D and self.use_3D:
@@ -187,7 +187,8 @@ class DataLoader:
                     "img_size must be declared as a list or a single integer value.")
 
             # Fix even sizes
-            img_size = [x + 1 if x % 2 != 0 else x for x in img_size]
+            if img_size is not None:
+                img_size = [x + 1 if x % 2 != 0 else x for x in img_size]
 
             self.img_size = img_size
 
@@ -211,9 +212,7 @@ class DataLoader:
                 self.norm_boundsB = norm_boundsB
 
             if self.is_3D and self.use_3D and patch_size is not None:
-                if patch_size > img_size[0] or \
-                   patch_size > img_size[1] or \
-                   patch_size > img_size[2]:
+                if self.img_size is not None and (patch_size > img_size[0] or patch_size > img_size[1] or patch_size > img_size[2]):
                     raise ValueError(
                         "patch_size must be lower than img_size.")
                 if patch_overlap < 0.0 or patch_overlap > 1.0:
@@ -531,21 +530,21 @@ class DataLoader:
             img: image or volume to be processed
 
         """
-        # Pad image
-        current_size = tf.shape(img)
-        diff = (self.img_size - current_size) // 2
-        pad_amount = tf.where(diff > 0, diff, 0)
-        pad_amount = tf.expand_dims(pad_amount, axis=-1)
-        paddings = tf.repeat(pad_amount, 2, axis=1)
-        img = tf.pad(img, paddings=paddings)
+        if self.img_size is not None:
+            # Pad image
+            current_size = tf.shape(img)
+            diff = (self.img_size - current_size) // 2
+            pad_amount = tf.where(diff > 0, diff, 0)
+            pad_amount = tf.expand_dims(pad_amount, axis=-1)
+            paddings = tf.repeat(pad_amount, 2, axis=1)
+            img = tf.pad(img, paddings=paddings)
 
-        # Crop image
-        current_size = tf.shape(img)
-        diff = (self.img_size - current_size) // 2
-        crop_begins = tf.where(diff < 0, -diff, 0)
-        # crop_ends = tf.repeat(self.img_size, tf.shape(crop_begins))
-        crop_ends = self.img_size
-        img = tf.slice(img, crop_begins, crop_ends)
+            # Crop image
+            current_size = tf.shape(img)
+            diff = (self.img_size - current_size) // 2
+            crop_begins = tf.where(diff < 0, -diff, 0)
+            crop_ends = self.img_size
+            img = tf.slice(img, crop_begins, crop_ends)
 
         img = tf.expand_dims(img, axis=-1)
         return img
@@ -617,7 +616,7 @@ class DataLoader:
 def generate_dataset(data_path,
                      imgA_label,
                      imgB_label,
-                     img_size,
+                     img_size=None,
                      output_dir=None,
                      extract_only=None,
                      norm_boundsA=None,
