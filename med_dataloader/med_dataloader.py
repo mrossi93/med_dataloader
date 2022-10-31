@@ -212,7 +212,10 @@ class DataLoader:
                 self.norm_boundsB = norm_boundsB
 
             if self.is_3D and self.use_3D and patch_size is not None:
-                if self.img_size is not None and (patch_size > img_size[0] or patch_size > img_size[1] or patch_size > img_size[2]):
+                if not isinstance(patch_size, list):
+                    raise ValueError(
+                        "patch_size must be declared as list.")                
+                if self.img_size is not None and (patch_size[0] > img_size[0] or patch_size[1] > img_size[1] or patch_size[2] > img_size[2]):
                     raise ValueError(
                         "patch_size must be lower than img_size.")
                 if patch_overlap < 0.0 or patch_overlap > 1.0:
