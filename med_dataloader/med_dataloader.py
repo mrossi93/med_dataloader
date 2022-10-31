@@ -553,7 +553,9 @@ class DataLoader:
         return img
 
     def patch_volume(self, img):
-        overlap_size = int(self.patch_size * self.patch_overlap)
+        overlap_size = [int(self.patch_size[0] * self.patch_overlap),
+                        int(self.patch_size[1] * self.patch_overlap),
+                        int(self.patch_size[2] * self.patch_overlap)]
         ksizes = [1,
                   self.patch_size,
                   self.patch_size,
