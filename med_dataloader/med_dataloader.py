@@ -212,7 +212,10 @@ class DataLoader:
                 self.norm_boundsB = norm_boundsB
 
             if self.is_3D and self.use_3D and patch_size is not None:
-                if self.img_size is not None and (patch_size > img_size[0] or patch_size > img_size[1] or patch_size > img_size[2]):
+                if not isinstance(patch_size, list):
+                    raise ValueError(
+                        "patch_size must be declared as list.")                
+                if self.img_size is not None and (patch_size[0] > img_size[0] or patch_size[1] > img_size[1] or patch_size[2] > img_size[2]):
                     raise ValueError(
                         "patch_size must be lower than img_size.")
                 if patch_overlap < 0.0 or patch_overlap > 1.0:
@@ -550,21 +553,23 @@ class DataLoader:
         return img
 
     def patch_volume(self, img):
-        overlap_size = int(self.patch_size * self.patch_overlap)
+        overlap_size = [int(self.patch_size[0] * self.patch_overlap),
+                        int(self.patch_size[1] * self.patch_overlap),
+                        int(self.patch_size[2] * self.patch_overlap)]
         ksizes = [1,
-                  self.patch_size,
-                  self.patch_size,
-                  self.patch_size,
+                  self.patch_size[0],
+                  self.patch_size[1],
+                  self.patch_size[2],
                   1]
         strides = [1,
-                   self.patch_size - overlap_size,
-                   self.patch_size - overlap_size,
-                   self.patch_size - overlap_size,
+                   self.patch_size[0] - overlap_size[0],
+                   self.patch_size[1] - overlap_size[1],
+                   self.patch_size[2] - overlap_size[2],
                    1]
         img = tf.expand_dims(img, axis=0)
         img = tf.extract_volume_patches(img, ksizes, strides, 'SAME')
         img = tf.reshape(img,
-                         [-1, self.patch_size, self.patch_size, self.patch_size])
+                         [-1, self.patch_size[0], self.patch_size[1], self.patch_size[2]])
         img = tf.expand_dims(img, axis=-1)
         return img
 
