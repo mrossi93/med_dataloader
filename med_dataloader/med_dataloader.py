@@ -43,6 +43,7 @@ class DataLoader:
         use_3D=False,
         patch_size=None,
         patch_overlap=0.0,
+        pad_val=0.0
     ):
         """[summary]
 
@@ -224,6 +225,7 @@ class DataLoader:
 
             self.patch_size = patch_size
             self.patch_overlap = patch_overlap
+            self.pad_val = float(pad_val)
 
             dataset_property = {"is_3D": self.is_3D,
                                 "img_size": self.img_size,
@@ -239,8 +241,8 @@ class DataLoader:
                                 "norm_boundsB": self.norm_boundsB,
                                 "use_3D": self.use_3D,
                                 "patch_size": self.patch_size,
-                                "patch_overlap": self.patch_overlap
-                                }
+                                "patch_overlap": self.patch_overlap,
+                                "pad_val": self.pad_val}
 
             output_dir_content = os.listdir(self.output_dir)
             if output_dir_content is not None:
@@ -537,7 +539,7 @@ class DataLoader:
             pad_amount = tf.where(diff > 0, diff, 0)
             pad_amount = tf.expand_dims(pad_amount, axis=-1)
             paddings = tf.repeat(pad_amount, 2, axis=1)
-            img = tf.pad(img, paddings=paddings)
+            img = tf.pad(img, paddings=paddings, constant_values=self.pad_val)
 
             # Crop image
             current_size = tf.shape(img)
@@ -626,6 +628,7 @@ def generate_dataset(data_path,
                      use_3D=False,
                      patch_size=None,
                      patch_overlap=0,
+                     pad_val=0.0,
                      ):
 
     data_loader = DataLoader(mode="gen",
@@ -642,6 +645,7 @@ def generate_dataset(data_path,
                              use_3D=use_3D,
                              patch_size=patch_size,
                              patch_overlap=patch_overlap,
+                             pad_val=pad_val
                              )
 
     data_loader.get_dataset()
