@@ -570,7 +570,7 @@ class DataLoader:
                    self.patch_size[2] - overlap_size[2],
                    1]
         img = tf.expand_dims(img, axis=0)
-        img = tf.extract_volume_patches(img, ksizes, strides, 'SAME')
+        img = tf.extract_volume_patches(img, ksizes, strides, 'VALID')
         img = tf.reshape(img,
                          [-1, self.patch_size[0], self.patch_size[1], self.patch_size[2]])
         img = tf.expand_dims(img, axis=-1)
